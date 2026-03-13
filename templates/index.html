@@ -60,7 +60,9 @@
     </div>
 
     <script>
-        // Actualiza el contador de caracteres en tiempo real
+        // Configuración automática de la URL
+        const BASE_URL = window.location.origin.includes("localhost") ? "" : "https://mentor-academico.onrender.com";
+
         function updateCharCount() {
             const text = document.getElementById('texto').value;
             document.getElementById('char-count').innerText = text.length;
@@ -74,7 +76,7 @@
             resDiv.innerHTML = '<span class="loading">El Mentor está procesando tu solicitud...</span>';
             
             try {
-                const res = await fetch(`/${tarea}`, {
+                const res = await fetch(`${BASE_URL}/${tarea}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ texto: texto })
@@ -94,11 +96,9 @@
         }
 
         async function verPublicidad() {
-            // Acción 1: Abrir el enlace de Adsterra
             window.open("https://www.effectivegatecpm.com/n2r78m21y?key=53d8cbd50aefa22ac6dd367853c1809e", "_blank");
             
-            // Acción 2: Validar en el backend para sumar +5 consultas
-            const res = await fetch('/confirmar_publicidad', { method: 'POST' });
+            const res = await fetch(`${BASE_URL}/confirmar_publicidad`, { method: 'POST' });
             
             if(res.ok) {
                 alert("¡Consultas activadas! El sistema se reiniciará para aplicar los cambios.");
@@ -111,3 +111,4 @@
     </script>
 </body>
 </html>
+
