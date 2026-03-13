@@ -8,6 +8,12 @@ from dotenv import load_dotenv
 load_dotenv()
 app = Flask(__name__)
 CORS(app)
+
+# RUTA DE SALUD PARA QUE RENDER NO DE ERROR
+@app.route("/", methods=["GET"])
+def health_check():
+    return jsonify({"status": "Mentor IA online"}), 200
+
 # Asegúrate de tener una SECRET_KEY larga y aleatoria en tus variables de Render
 app.secret_key = os.environ.get("SECRET_KEY", "una_clave_muy_segura_y_larga_por_defecto")
 
@@ -105,8 +111,7 @@ def manejar_tarea(tarea):
         db.session.commit()
     return jsonify({"resultado": resultado})
 
-# MODIFICACIÓN CLAVE PARA RENDER:
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-    
+        
