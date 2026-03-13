@@ -2,70 +2,112 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Mentor IA Premium Académico</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mentor IA - Beta 1 (Entrenador Académico)</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 20px; background-color: #f0f2f5; }
-        .container { max-width: 800px; margin: auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
-        textarea { width: 100%; height: 150px; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        button { padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #0056b3; }
-        .ad-btn { background: #28a745; }
-        #resultado { margin-top: 20px; white-space: pre-wrap; background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 5px solid #007bff; }
-        .status { font-weight: bold; color: #555; margin-bottom: 10px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 900px; margin: 40px auto; background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 25px; }
+        
+        .status-bar { display: flex; justify-content: space-between; align-items: center; background: #e8f4fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #b3d7ff; }
+        .char-counter { font-size: 0.85em; color: #666; text-align: right; margin-bottom: 5px; }
+        
+        textarea { width: 100%; height: 200px; padding: 15px; border: 2px solid #ddd; border-radius: 10px; resize: none; font-size: 16px; box-sizing: border-box; transition: border-color 0.3s; }
+        textarea:focus { border-color: #007bff; outline: none; }
+        
+        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 15px; }
+        
+        button { padding: 12px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
+        .btn-main { background: #007bff; color: white; }
+        .btn-main:hover { background: #0056b3; transform: translateY(-2px); }
+        
+        .btn-load { background: #6c757d; color: white; grid-column: 1 / -1; font-size: 1.1em; }
+        .btn-load:hover { background: #5a6268; }
+        
+        .btn-ad { background: #28a745; color: white; width: 100%; margin-top: 20px; font-size: 1.1em; box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3); }
+        .btn-ad:hover { background: #218838; transform: scale(1.02); }
+
+        #resultado { margin-top: 30px; padding: 20px; background: #fafafa; border-radius: 10px; border-left: 6px solid #007bff; min-height: 120px; line-height: 1.6; }
+        .loading { color: #007bff; font-style: italic; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Mentor IA Premium</h1>
-        <div id="status" class="status">Cargando consultas...</div>
+        <h1>Mentor IA Académico</h1>
         
-        <textarea id="texto" placeholder="Pega tu material, duda o respuesta aquí..."></textarea>
+        <div class="status-bar">
+            <span>🛡️ Modo: Beta 1</span>
+            <span id="consultas-info">Cargando cupos...</span>
+        </div>
+
+        <div class="char-counter">Caracteres: <span id="char-count">0</span> / 5000</div>
+        <textarea id="texto" placeholder="Pega aquí el texto del PDF, la consigna de tu profesor o tu duda académica..." oninput="updateCharCount()"></textarea>
         
         <div class="controls">
-            <button onclick="enviar('analizar')">Analizar</button>
-            <button onclick="enviar('resumen')">Resumen</button>
-            <button onclick="enviar('explicar')">Explicar Concepto</button>
-            <button onclick="enviar('rap')">Rap Académico</button>
-            <button onclick="enviar('mapa_conceptual')">Mapa Conceptual</button>
-            <button onclick="enviar('aleatorio')">Ejercicios Aleatorios</button>
+            <button class="btn-load" onclick="enviar('cargar_material')">📌 Paso 1: Cargar Material de Estudio (Gratis)</button>
+            
+            <button class="btn-main" onclick="enviar('analizar')">Analizar Texto</button>
+            <button class="btn-main" onclick="enviar('resumen')">Generar Resumen</button>
+            <button class="btn-main" onclick="enviar('explicar')">Explicar Concepto</button>
+            <button class="btn-main" onclick="enviar('rap')">Rap Académico</button>
+            <button class="btn-main" onclick="enviar('mapa_conceptual')">Mapa Conceptual</button>
+            <button class="btn-main" onclick="enviar('aleatorio')">Práctica Aleatoria</button>
         </div>
-        <br>
-        <button class="ad-btn" onclick="verPublicidad()">Ver publicidad (+5 consultas)</button>
+        
+        <button class="btn-ad" onclick="verPublicidad()">🔓 Desbloquear +5 Consultas (Ver Anuncio)</button>
 
-        <div id="resultado">El resultado aparecerá aquí...</div>
+        <div id="resultado">El análisis del Entrenador aparecerá aquí...</div>
     </div>
 
     <script>
-        // Cargar estado inicial
-        async function cargarEstado() {
-            const res = await fetch('/estado_usuario'); // Deberías añadir esta ruta en app.py
-            const data = await res.json();
-            document.getElementById('status').innerText = `Consultas usadas: ${data.consultas_usadas} | Tipo: ${data.tipo_usuario}`;
+        // Actualiza el contador de caracteres en tiempo real
+        function updateCharCount() {
+            const text = document.getElementById('texto').value;
+            document.getElementById('char-count').innerText = text.length;
         }
 
         async function enviar(tarea) {
             const texto = document.getElementById('texto').value;
-            const res = await fetch(`/${tarea}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ texto })
-            });
-            const data = await res.json();
-            if(data.error) alert(data.error);
-            else document.getElementById('resultado').innerText = data.resultado;
-            cargarEstado();
-        }
+            if (!texto) return alert("Por favor, ingresa contenido para procesar.");
 
-        async function verPublicidad() {
-            const res = await fetch('/confirmar_publicidad', { method: 'POST' });
-            if(res.ok) {
-                alert("¡Publicidad confirmada! Tienes 5 consultas extra.");
-                cargarEstado();
+            const resDiv = document.getElementById('resultado');
+            resDiv.innerHTML = '<span class="loading">El Mentor está procesando tu solicitud...</span>';
+            
+            try {
+                const res = await fetch(`/${tarea}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ texto: texto })
+                });
+                
+                const data = await res.json();
+                
+                if(data.error) {
+                    resDiv.innerText = "⚠️ Error: " + data.error;
+                    if(res.status === 403) alert("Llegaste al límite. Mira un anuncio para continuar.");
+                } else {
+                    resDiv.innerText = data.resultado;
+                }
+            } catch (err) {
+                resDiv.innerText = "Error crítico de conexión.";
             }
         }
 
-        cargarEstado();
+        async function verPublicidad() {
+            // Acción 1: Abrir el enlace de Adsterra
+            window.open("https://www.effectivegatecpm.com/n2r78m21y?key=53d8cbd50aefa22ac6dd367853c1809e", "_blank");
+            
+            // Acción 2: Validar en el backend para sumar +5 consultas
+            const res = await fetch('/confirmar_publicidad', { method: 'POST' });
+            
+            if(res.ok) {
+                alert("¡Consultas activadas! El sistema se reiniciará para aplicar los cambios.");
+                location.reload(); 
+            } else {
+                const data = await res.json();
+                alert(data.error || "No se pudo validar la publicidad.");
+            }
+        }
     </script>
 </body>
 </html>
