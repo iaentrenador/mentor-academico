@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 load_dotenv()
 app = Flask(__name__)
 CORS(app)
-app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+# Asegúrate de tener una SECRET_KEY larga y aleatoria en tus variables de Render
+app.secret_key = os.environ.get("SECRET_KEY", "una_clave_muy_segura_y_larga_por_defecto")
 
 # Configuración Gemini
 genai.configure(api_key=os.environ.get("API_KEY"))
@@ -55,7 +56,6 @@ def puede_usar_consulta(u):
     total_permitido = 5 + (u.bloques_publicidad_vistos * 5)
     return u.consultas_usadas < total_permitido
 
-# Diccionario de funciones del Entrenador
 def ejecutar_tarea_ia(tarea, texto, material):
     instrucciones = {
         "analizar": f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nSolicitud: Analiza y explica el siguiente texto: {texto}",
@@ -68,8 +68,6 @@ def ejecutar_tarea_ia(tarea, texto, material):
     }
     prompt = instrucciones.get(tarea, f"{ACADEMIC_COACH_PERSONA}\n\nProcesa: {texto}")
     return model.generate_content(prompt).text
-
-
 
 @app.route("/cargar_material", methods=["POST"])
 def cargar_material():
@@ -107,5 +105,8 @@ def manejar_tarea(tarea):
         db.session.commit()
     return jsonify({"resultado": resultado})
 
-if __name__ == "__main__": app.run()
+# MODIFICACIÓN CLAVE PARA RENDER:
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
     
