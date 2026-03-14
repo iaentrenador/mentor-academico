@@ -15,8 +15,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "una_clave_muy_segura_y_larga_por_
 db_uri = os.environ.get("DATABASE_URL")
 
 if not db_uri:
-    # Si esto ocurre, Render no está cargando la variable
-    raise RuntimeError("ERROR: DATABASE_URL no está configurada en las variables de entorno de Render.")
+    raise RuntimeError("ERROR: DATABASE_URL no está configurada en Render.")
 
 if db_uri.startswith("postgres://"):
     db_uri = db_uri.replace("postgres://", "postgresql://", 1)
@@ -55,7 +54,7 @@ class Usuario(db.Model):
     bloques_publicidad_vistos = db.Column(db.Integer, default=0) 
     material = db.Column(db.Text)
 
-# Creación de tablas dentro del contexto
+# Creación de tablas
 with app.app_context():
     db.create_all()
 
@@ -92,8 +91,16 @@ def health_check():
         return jsonify({"status": "Mentor IA online"}), 200
 
 def puede_usar_consulta(u):
-    # --- CAMBIO PARA DESBLOQUEAR ACCESO ---
-    return True
+    if u.tipo_usuario == "super": return True
+    ahora = datetime.datetime.utcnow()
+    # Si pasó más de un día, reseteamos contadores
+    if u.ultima_consulta and (ahora - u.ultima_consulta).total_seconds() > 86400:
+        u.consultas_usadas = 0
+        u.bloques_publicidad_vistos = 0
+        db.session.commit()
+    
+    total_permitido = 5 + (u.bloques_publicidad_vistos * 5)
+    return u.consultas_usadas < total_permitido
 
 def ejecutar_tarea_ia(tarea, texto, material):
     prompt = f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nAcción: {tarea}\n\nTexto: {texto}"
@@ -121,8 +128,13 @@ def confirmar_publicidad():
 def manejar_tarea(tarea):
     if tarea == "cargar_material": return cargar_material()
     u = Usuario.query.get(session.get("usuario_id"))
-    if not u or not puede_usar_consulta(u): return jsonify({"error": "Consultas agotadas."}), 403
+    if not u: return jsonify({"error": "No logueado"}), 401
+    
+    if not puede_usar_consulta(u):
+        return jsonify({"error": "Consultas agotadas."}), 403
+        
     resultado = ejecutar_tarea_ia(tarea, request.json.get("texto", ""), u.material or "")
+    
     if u.tipo_usuario != "super":
         u.consultas_usadas += 1
         u.ultima_consulta = datetime.datetime.utcnow()
@@ -132,3 +144,4 @@ def manejar_tarea(tarea):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+    
