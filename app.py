@@ -92,14 +92,8 @@ def health_check():
         return jsonify({"status": "Mentor IA online"}), 200
 
 def puede_usar_consulta(u):
-    if u.tipo_usuario == "super": return True
-    ahora = datetime.datetime.utcnow()
-    if u.ultima_consulta and (ahora - u.ultima_consulta).total_seconds() > 86400:
-        u.consultas_usadas = 0
-        u.bloques_publicidad_vistos = 0
-        db.session.commit()
-    total_permitido = 5 + (u.bloques_publicidad_vistos * 5)
-    return u.consultas_usadas < total_permitido
+    # --- CAMBIO PARA DESBLOQUEAR ACCESO ---
+    return True
 
 def ejecutar_tarea_ia(tarea, texto, material):
     prompt = f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nAcción: {tarea}\n\nTexto: {texto}"
@@ -138,4 +132,3 @@ def manejar_tarea(tarea):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-    
