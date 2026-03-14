@@ -8,3 +8,5 @@ google-auth-oauthlib
 google-auth-httplib2
 requests
 gunicorn
+psycopg2-binary
+authlib
