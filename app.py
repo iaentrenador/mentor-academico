@@ -1,48 +1,43 @@
-# ================== app.py – Mentor IA Beta 1 ==================
+# ================== app.py – Mentor IA Beta 2 ==================
 import os, datetime, google.generativeai as genai
-from flask import Flask, request, jsonify, session, send_file
+from flask import Flask, request, jsonify, session, send_file, redirect, url_for
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
+from authlib.integrations.flask_client import OAuth
 
 load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# RUTA DE SALUD Y SERVICIO DE INTERFAZ
-@app.route("/", methods=["GET"])
-def health_check():
-    # Buscamos index.html específicamente dentro de la carpeta 'templates'
-    try:
-        return send_file(os.path.join("templates", "index.html"))
-    except:
-        return jsonify({"status": "Mentor IA online"}), 200
-
-# Asegúrate de tener una SECRET_KEY larga y aleatoria en tus variables de Render
+# Asegúrate de tener una SECRET_KEY larga y aleatoria en Render
 app.secret_key = os.environ.get("SECRET_KEY", "una_clave_muy_segura_y_larga_por_defecto")
+
+# Configuración Base de Datos (PostgreSQL en Render)
+db_uri = os.environ.get("DATABASE_URL")
+if db_uri and db_uri.startswith("postgres://"):
+    db_uri = db_uri.replace("postgres://", "postgresql://", 1)
+app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+db = SQLAlchemy(app)
+
+# Configuración Google Auth
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id=os.environ.get("GOOGLE_CLIENT_ID"),
+    client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'}
+)
 
 # Configuración Gemini
 genai.configure(api_key=os.environ.get("API_KEY"))
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# Persona Académica para el Entrenador
 ACADEMIC_COACH_PERSONA = """
 Eres un entrenador académico universitario especializado en comprensión de textos, desarrollo conceptual y mejora de respuestas escritas.
-Tu objetivo no es hacer las tareas por el estudiante, sino entrenar su pensamiento académico.
-SIEMPRE compórtate como un docente universitario.
-
-REGLAS OBLIGATORIAS:
-1. Nunca escribas la respuesta completa al ejercicio.
-2. No resuelvas consignas directamente.
-3. Evalúa, orienta y explica.
-4. Proporciona ejemplos similares pero diferentes si se trata de ejercicios.
-5. El estudiante debe construir su propia respuesta.
+SIEMPRE compórtate como un docente universitario. REGLAS: No resuelvas consignas directamente, orienta al estudiante.
 """
-
-# Base de Datos
-db_path = os.path.join(os.path.dirname(__file__), "mentor_db.sqlite")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + db_path
-db = SQLAlchemy(app)
 
 class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -56,6 +51,40 @@ class Usuario(db.Model):
 with app.app_context():
     db.create_all()
 
+# --- RUTAS DE AUTH Y CUPOS ---
+@app.route('/login')
+def login():
+    return google.authorize_redirect(url_for('callback', _external=True))
+
+@app.route('/callback')
+def callback():
+    token = google.authorize_access_token()
+    user_info = google.parse_id_token(token)
+    email = user_info['email']
+    u = Usuario.query.filter_by(email=email).first()
+    if not u:
+        if Usuario.query.count() >= 20:
+            return "Lo sentimos, el cupo de la Beta está completo.", 403
+        u = Usuario(email=email, tipo_usuario="normal")
+        db.session.add(u)
+        db.session.commit()
+    session['usuario_id'] = u.id
+    return redirect('/')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
+
+# --- RUTA PRINCIPAL ---
+@app.route("/", methods=["GET"])
+def health_check():
+    try:
+        return send_file(os.path.join("templates", "index.html"))
+    except:
+        return jsonify({"status": "Mentor IA online"}), 200
+
+# --- LÓGICA DE IA ---
 def puede_usar_consulta(u):
     if u.tipo_usuario == "super": return True
     ahora = datetime.datetime.utcnow()
@@ -67,24 +96,14 @@ def puede_usar_consulta(u):
     return u.consultas_usadas < total_permitido
 
 def ejecutar_tarea_ia(tarea, texto, material):
-    instrucciones = {
-        "analizar": f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nSolicitud: Analiza y explica el siguiente texto: {texto}",
-        "evaluar": f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nEvalúa la respuesta: '{texto}'. Estructura: 1. Calificación, 2. Análisis, 3. Fortalezas, 4. Aspectos a mejorar, 5. Sugerencias, 6. Reintento sugerido.",
-        "resumen": f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nGenera un resumen profesional, jerárquico y con conceptos clave del texto: {texto}",
-        "mapa_conceptual": f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nCrea una estructura de red conceptual para: {texto}",
-        "rap": f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nCrea un 'Rap Técnico' para memorización técnica de: {texto}. Usa lenguaje literal y términos académicos.",
-        "explicar": f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nExplica con profundidad académica la siguiente pregunta/consigna: {texto}",
-        "aleatorio": f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nGenera un ejercicio práctico o concepto complejo relacionado con el material proporcionado."
-    }
-    prompt = instrucciones.get(tarea, f"{ACADEMIC_COACH_PERSONA}\n\nProcesa: {texto}")
+    prompt = f"{ACADEMIC_COACH_PERSONA}\n\nContexto: {material}\n\nAcción: {tarea}\n\nTexto: {texto}"
     return model.generate_content(prompt).text
 
 @app.route("/cargar_material", methods=["POST"])
 def cargar_material():
     u = Usuario.query.get(session.get("usuario_id"))
     if not u: return jsonify({"error": "No logueado"}), 401
-    data = request.json
-    u.material = data.get("material", "")
+    u.material = request.json.get("material", "")
     db.session.commit()
     return jsonify({"resultado": "Material cargado exitosamente."})
 
@@ -95,20 +114,15 @@ def confirmar_publicidad():
     if u.bloques_publicidad_vistos < 2:
         u.bloques_publicidad_vistos += 1
         db.session.commit()
-        return jsonify({"resultado": "Bloque de consultas activado."})
+        return jsonify({"resultado": "Consultas desbloqueadas."})
     return jsonify({"error": "Límite alcanzado"}), 400
 
 @app.route("/<tarea>", methods=["POST"])
 def manejar_tarea(tarea):
     if tarea == "cargar_material": return cargar_material()
-    
     u = Usuario.query.get(session.get("usuario_id"))
-    if not u or not puede_usar_consulta(u): 
-        return jsonify({"error": "Consultas agotadas."}), 403
-    
-    data = request.json
-    resultado = ejecutar_tarea_ia(tarea, data.get("texto", ""), u.material or "")
-    
+    if not u or not puede_usar_consulta(u): return jsonify({"error": "Consultas agotadas."}), 403
+    resultado = ejecutar_tarea_ia(tarea, request.json.get("texto", ""), u.material or "")
     if u.tipo_usuario != "super":
         u.consultas_usadas += 1
         u.ultima_consulta = datetime.datetime.utcnow()
@@ -118,4 +132,3 @@ def manejar_tarea(tarea):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-           
