@@ -10,17 +10,22 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Configuración Base de Datos
+# Configuración Base de Datos (Validada)
 app.secret_key = os.environ.get("SECRET_KEY", "una_clave_muy_segura_y_larga_por_defecto")
 db_uri = os.environ.get("DATABASE_URL")
-if db_uri and db_uri.startswith("postgres://"):
+
+if not db_uri:
+    # Si esto ocurre, Render no está cargando la variable
+    raise RuntimeError("ERROR: DATABASE_URL no está configurada en las variables de entorno de Render.")
+
+if db_uri.startswith("postgres://"):
     db_uri = db_uri.replace("postgres://", "postgresql://", 1)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy()
-db.init_app(app) # Inicialización diferida para evitar el error de conexión al arrancar
+db.init_app(app) 
 
 # Configuración Google Auth
 oauth = OAuth(app)
