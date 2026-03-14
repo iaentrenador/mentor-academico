@@ -1,4 +1,4 @@
-# ================== app.py – Mentor IA Beta 2 ==================
+# ================== app.py – Mentor IA Beta 2 Final ==================
 import os, datetime, google.generativeai as genai
 from flask import Flask, request, jsonify, session, send_file, redirect, url_for
 from flask_cors import CORS
@@ -10,15 +10,17 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Asegúrate de tener una SECRET_KEY larga y aleatoria en Render
+# Configuración Base de Datos
 app.secret_key = os.environ.get("SECRET_KEY", "una_clave_muy_segura_y_larga_por_defecto")
-
-# Configuración Base de Datos (PostgreSQL en Render)
 db_uri = os.environ.get("DATABASE_URL")
 if db_uri and db_uri.startswith("postgres://"):
     db_uri = db_uri.replace("postgres://", "postgresql://", 1)
+
 app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
-db = SQLAlchemy(app)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db = SQLAlchemy()
+db.init_app(app) # Inicialización diferida para evitar el error de conexión al arrancar
 
 # Configuración Google Auth
 oauth = OAuth(app)
@@ -48,10 +50,11 @@ class Usuario(db.Model):
     bloques_publicidad_vistos = db.Column(db.Integer, default=0) 
     material = db.Column(db.Text)
 
+# Creación de tablas dentro del contexto
 with app.app_context():
     db.create_all()
 
-# --- RUTAS DE AUTH Y CUPOS ---
+# --- RUTAS ---
 @app.route('/login')
 def login():
     return google.authorize_redirect(url_for('callback', _external=True))
@@ -76,7 +79,6 @@ def logout():
     session.clear()
     return redirect('/')
 
-# --- RUTA PRINCIPAL ---
 @app.route("/", methods=["GET"])
 def health_check():
     try:
@@ -84,7 +86,6 @@ def health_check():
     except:
         return jsonify({"status": "Mentor IA online"}), 200
 
-# --- LÓGICA DE IA ---
 def puede_usar_consulta(u):
     if u.tipo_usuario == "super": return True
     ahora = datetime.datetime.utcnow()
@@ -132,3 +133,4 @@ def manejar_tarea(tarea):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+    
