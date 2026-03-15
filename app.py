@@ -27,13 +27,20 @@ db = SQLAlchemy()
 db.init_app(app) 
 
 # Configuración Google Auth
+# CORRECCIÓN: Validamos que las variables existan para evitar errores de parámetro faltante
+client_id = os.environ.get("GOOGLE_CLIENT_ID")
+client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+
+if not client_id or not client_secret:
+    print("ADVERTENCIA: Las variables de Google no están cargadas correctamente.")
+
 oauth = OAuth(app)
 google = oauth.register(
     name='google',
-    client_id=os.environ.get("GOOGLE_CLIENT_ID"),
-    client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
+    client_id=client_id,
+    client_secret=client_secret,
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    client_kwargs={'scope': 'openid email profile'}
+    client_kwargs={'scope': 'openid email profile', 'prompt': 'select_account'} # Prompt agregado para selector de cuenta
 )
 
 # Configuración Gemini
@@ -140,6 +147,3 @@ def manejar_tarea(tarea):
         u.ultima_consulta = datetime.datetime.utcnow()
         db.session.commit()
     return jsonify({"resultado": resultado})
-
-# Se ha omitido la ejecución directa (app.run) para permitir que Gunicorn 
-# maneje el servidor en producción a través del comando 'gunicorn app:app'.
