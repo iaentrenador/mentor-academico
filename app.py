@@ -3,10 +3,8 @@ import os, datetime, google.generativeai as genai
 from flask import Flask, request, jsonify, session, send_file, redirect, url_for
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from dotenv import load_dotenv
 from authlib.integrations.flask_client import OAuth
 
-load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
