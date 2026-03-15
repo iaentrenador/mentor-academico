@@ -27,7 +27,6 @@ db = SQLAlchemy()
 db.init_app(app) 
 
 # Configuración Google Auth
-# CORRECCIÓN: Validamos que las variables existan para evitar errores de parámetro faltante
 client_id = os.environ.get("GOOGLE_CLIENT_ID")
 client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
 
@@ -40,7 +39,7 @@ google = oauth.register(
     client_id=client_id,
     client_secret=client_secret,
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    client_kwargs={'scope': 'openid email profile', 'prompt': 'select_account'} # Prompt agregado para selector de cuenta
+    client_kwargs={'scope': 'openid email profile', 'prompt': 'select_account'}
 )
 
 # Configuración Gemini
@@ -61,9 +60,13 @@ class Usuario(db.Model):
     bloques_publicidad_vistos = db.Column(db.Integer, default=0) 
     material = db.Column(db.Text)
 
-# Creación de tablas
-with app.app_context():
-    db.create_all()
+# Creación de tablas (Versión segura para evitar el error 502 al arrancar)
+try:
+    with app.app_context():
+        db.create_all()
+        print("INFO: Base de datos inicializada correctamente.")
+except Exception as e:
+    print(f"DEBUG: Error al crear tablas: {e}")
 
 # --- RUTAS ---
 @app.route('/login')
@@ -147,3 +150,4 @@ def manejar_tarea(tarea):
         u.ultima_consulta = datetime.datetime.utcnow()
         db.session.commit()
     return jsonify({"resultado": resultado})
+    
