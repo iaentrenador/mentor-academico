@@ -1,18 +1,20 @@
+# Imagen base ligera de Python
 FROM python:3.11-slim
+
+# Establecer directorio de trabajo
 WORKDIR /app
 
-# Instalar compiladores y librerías necesarias
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copiar requisitos y luego instalar
+# Copiar el archivo de requerimientos
 COPY requisitos.txt .
+
+# Instalar dependencias sin cache
 RUN pip install --no-cache-dir -r requisitos.txt
 
-# Copiar todo el proyecto
+# Copiar el resto del proyecto
 COPY . .
 
-# Comando de arranque
-CMD gunicorn app:app --bind 0.0.0.0:${PORT:-8080}
+# Puerto por defecto de Render
+ENV PORT=10000
+
+# Comando para ejecutar la app
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:10000"]
