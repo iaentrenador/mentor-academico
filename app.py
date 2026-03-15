@@ -111,7 +111,7 @@ def puede_usar_consulta(u):
         u.bloques_publicidad_vistos = 0
         db.session.commit()
     
-total_permitido = 5 + (u.bloques_publicidad_vistos * 5)
+    total_permitido = 5 + (u.bloques_publicidad_vistos * 5)
     return u.consultas_usadas < total_permitido
 
 def ejecutar_tarea_ia(tarea, texto, material):
@@ -156,3 +156,4 @@ def manejar_tarea(tarea):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+        
