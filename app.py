@@ -141,7 +141,5 @@ def manejar_tarea(tarea):
         db.session.commit()
     return jsonify({"resultado": resultado})
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-    
+# Se ha omitido la ejecución directa (app.run) para permitir que Gunicorn 
+# maneje el servidor en producción a través del comando 'gunicorn app:app'.
