@@ -1,12 +1,9 @@
-flask
-flask-cors
-flask-sqlalchemy
-google-generativeai
+Flask
+Flask-CORS
+Flask-SQLAlchemy
 python-dotenv
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
+google-generativeai
+authlib
 requests
 gunicorn
 psycopg2-binary
-authlib
