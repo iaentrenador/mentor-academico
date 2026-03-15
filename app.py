@@ -203,6 +203,11 @@ def manejar_tarea(tarea):
     db.session.commit()
     return jsonify({"resultado": resultado})
 
+# ================== ARRANQUE ==================
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    port = int(os.environ.get("PORT", 10000))  # Render asigna PORT automáticamente
+    print(f"INFO: Arrancando Mentor IA en puerto {port}...")
+    try:
+        app.run(host="0.0.0.0", port=port)
+    except Exception as e:
+        print(f"ERROR: No se pudo iniciar la app: {e}")
