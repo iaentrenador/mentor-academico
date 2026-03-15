@@ -95,7 +95,11 @@ def logout():
 def health_check():
     try:
         return send_file(os.path.join("templates", "index.html"))
-    except:
+    except FileNotFoundError:
+        print("Error: Archivo index.html no encontrado")
+        return jsonify({"status": "Mentor IA online"}), 200
+    except Exception as e:
+        print(f"Error: {e}")
         return jsonify({"status": "Mentor IA online"}), 200
 
 def puede_usar_consulta(u):
@@ -107,7 +111,7 @@ def puede_usar_consulta(u):
         u.bloques_publicidad_vistos = 0
         db.session.commit()
     
-    total_permitido = 5 + (u.bloques_publicidad_vistos * 5)
+total_permitido = 5 + (u.bloques_publicidad_vistos * 5)
     return u.consultas_usadas < total_permitido
 
 def ejecutar_tarea_ia(tarea, texto, material):
@@ -148,4 +152,7 @@ def manejar_tarea(tarea):
         u.ultima_consulta = datetime.datetime.utcnow()
         db.session.commit()
     return jsonify({"resultado": resultado})
-    
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
