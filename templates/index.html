@@ -9,32 +9,31 @@
         .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #2c3e50; }
         .nav-links { text-align: right; margin-bottom: 10px; }
-        .btn-login { padding: 10px 20px; background: #4285f4; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
-        .btn-logout { padding: 10px 20px; background: #ea4335; color: white; text-decoration: none; border-radius: 8px; }
-        textarea { width: 100%; height: 180px; padding: 12px; border: 2px solid #ddd; border-radius: 10px; box-sizing: border-box; resize: vertical; }
+        .btn-login { padding: 8px 16px; background: #4285f4; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; }
+        .btn-logout { padding: 8px 16px; background: #ea4335; color: white; text-decoration: none; border-radius: 6px; }
+        textarea { width: 100%; height: 180px; padding: 12px; border: 2px solid #ddd; border-radius: 10px; box-sizing: border-box; }
         .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 15px; }
-        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; background: #2c3e50; color: white; font-weight: 600; transition: background 0.3s; }
+        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; background: #2c3e50; color: white; font-weight: 600; }
         button:hover { background: #34495e; }
         .btn-load { background: #27ae60; grid-column: 1 / -1; }
-        #resultado { margin-top: 20px; padding: 20px; background: #f9f9f9; border-radius: 10px; border-left: 5px solid #2c3e50; min-height: 50px; white-space: pre-wrap; }
+        #resultado { margin-top: 20px; padding: 20px; background: #f9f9f9; border-radius: 10px; border-left: 5px solid #2c3e50; white-space: pre-wrap; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Mentor IA Académico</h1>
         <div class="nav-links">
-            <a href="/login" class="btn-login">🔑 Ingresar</a>
+            <a href="/login" class="btn-login">🔑 Login</a>
             <a href="/logout" class="btn-logout">🚪 Salir</a>
         </div>
         
         <textarea id="texto" placeholder="Pega aquí tu material o tu pregunta..."></textarea>
         
         <div class="controls">
-            <button class="btn-load" onclick="enviar('cargar_material')">📌 Guardar Material de Estudio</button>
-            <button onclick="enviar('resumen')">Resumen</button>
-            <button onclick="enviar('explicar')">Explicar Conceptos</button>
-            <button onclick="enviar('corregir')">Corregir Redacción</button>
-            <button onclick="enviar('desafio')">Práctica/Desafío</button>
+            <button class="btn-load" onclick="enviar('cargar_material')">📌 Guardar Material</button>
+            <button onclick="enviar('resumir')">Resumir</button>
+            <button onclick="enviar('explicar')">Explicar</button>
+            <button onclick="enviar('evaluar')">Evaluar</button>
         </div>
 
         <div id="resultado">El resultado aparecerá aquí...</div>
@@ -45,19 +44,25 @@
             const texto = document.getElementById('texto').value;
             const resDiv = document.getElementById('resultado');
             
+            // Validación: Solo permitimos enviar si hay texto (o si es cargar material)
             if (tarea !== 'cargar_material' && !texto) return alert("Ingresa contenido primero.");
             resDiv.innerText = "Pensando...";
 
             try {
+                // Sincronizado con app.py: enviamos solo el texto o el material
+                const payload = tarea === 'cargar_material' ? { material: texto } : { texto: texto };
+                
                 const response = await fetch(`/${tarea}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ texto: texto, material: texto })
+                    body: JSON.stringify(payload)
                 });
                 const data = await response.json();
-                resDiv.innerText = data.resultado || data.res || "Error en la operación.";
+                
+                // Mostramos el resultado dependiendo de la clave devuelta por el servidor
+                resDiv.innerText = data.resultado || data.res || data.error || "Operación completada.";
             } catch (err) {
-                resDiv.innerText = "⚠️ Error de conexión con el servidor.";
+                resDiv.innerText = "⚠️ Error de conexión.";
             }
         }
     </script>
