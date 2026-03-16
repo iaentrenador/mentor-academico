@@ -3,107 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mentor IA - Beta 5.3</title>
+    <title>Mentor IA - Beta 2.1</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: #f4f7f6; padding: 20px; }
-        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #2c3e50; }
-        .btn-login { display: block; text-align: center; margin-bottom: 20px; padding: 12px; background: #4285f4; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
-        textarea { width: 100%; height: 150px; padding: 10px; border: 2px solid #ddd; border-radius: 10px; box-sizing: border-box; }
-        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 15px; }
-        button { padding: 10px; border: none; border-radius: 8px; cursor: pointer; background: #007bff; color: white; font-weight: 600; }
-        .btn-load { background: #6c757d; grid-column: 1 / -1; }
-        #resultado { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 10px; border-left: 5px solid #007bff; white-space: pre-wrap; }
-        .acordeon { cursor: pointer; padding: 10px; background: #e9ecef; margin-bottom: 5px; border-radius: 8px; font-weight: bold; }
-        .panel { padding: 10px; display: none; background: #f1f3f5; border-radius: 8px; margin-bottom: 10px; white-space: pre-wrap; }
+        .nav-links { text-align: right; margin-bottom: 10px; }
+        .btn-login { padding: 10px 20px; background: #4285f4; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
+        .btn-logout { padding: 10px 20px; background: #ea4335; color: white; text-decoration: none; border-radius: 8px; }
+        textarea { width: 100%; height: 180px; padding: 12px; border: 2px solid #ddd; border-radius: 10px; box-sizing: border-box; resize: vertical; }
+        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 15px; }
+        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; background: #2c3e50; color: white; font-weight: 600; transition: background 0.3s; }
+        button:hover { background: #34495e; }
+        .btn-load { background: #27ae60; grid-column: 1 / -1; }
+        #resultado { margin-top: 20px; padding: 20px; background: #f9f9f9; border-radius: 10px; border-left: 5px solid #2c3e50; min-height: 50px; white-space: pre-wrap; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Mentor IA Académico</h1>
-        <a href="/login" class="btn-login">🔑 Iniciar sesión con Google</a>
+        <div class="nav-links">
+            <a href="/login" class="btn-login">🔑 Ingresar</a>
+            <a href="/logout" class="btn-logout">🚪 Salir</a>
+        </div>
         
-        <textarea id="texto" placeholder="Pega aquí el material de estudio..."></textarea>
+        <textarea id="texto" placeholder="Pega aquí tu material o tu pregunta..."></textarea>
         
         <div class="controls">
-            <button class="btn-load" onclick="enviar('cargar_material')">📌 Cargar Material</button>
-            <button onclick="enviar('analizar')">Analizar</button>
+            <button class="btn-load" onclick="enviar('cargar_material')">📌 Guardar Material de Estudio</button>
             <button onclick="enviar('resumen')">Resumen</button>
-            <button onclick="enviar('explicar')">Explicar</button>
-            <button onclick="enviar('rap')">Rap Académico</button>
-            <button onclick="enviar('mapa_conceptual')">Mapa Conceptual</button>
-            <button onclick="enviar('aleatorio')">Práctica Aleatoria</button>
-            <button onclick="enviar('informe_progreso')">📝 Informe de Progreso</button>
-            <button onclick="enviar('diagnostico')">📊 Diagnóstico Pedagógico</button>
+            <button onclick="enviar('explicar')">Explicar Conceptos</button>
+            <button onclick="enviar('corregir')">Corregir Redacción</button>
+            <button onclick="enviar('desafio')">Práctica/Desafío</button>
         </div>
 
         <div id="resultado">El resultado aparecerá aquí...</div>
     </div>
 
     <script>
-        const BASE_URL = window.location.origin;
-        const acordeonEstados = {};
-
         async function enviar(tarea) {
             const texto = document.getElementById('texto').value;
-            if (!texto) return alert("Ingresa contenido.");
-            const resultadoDiv = document.getElementById('resultado');
-            resultadoDiv.innerHTML = "Procesando...";
+            const resDiv = document.getElementById('resultado');
+            
+            if (tarea !== 'cargar_material' && !texto) return alert("Ingresa contenido primero.");
+            resDiv.innerText = "Pensando...";
 
             try {
-                const res = await fetch(`${BASE_URL}/${tarea}`, {
+                const response = await fetch(`/${tarea}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ texto: texto })
+                    body: JSON.stringify({ texto: texto, material: texto })
                 });
-                const data = await res.json();
-
-                if (data.error) {
-                    resultadoDiv.innerText = "⚠️ " + data.error;
-                    return;
-                }
-
-                if (tarea === 'informe_progreso' || tarea === 'diagnostico') {
-                    mostrarAcordeon(data.resultado);
-                } else {
-                    resultadoDiv.innerText = data.resultado;
-                }
-
+                const data = await response.json();
+                resDiv.innerText = data.resultado || data.res || "Error en la operación.";
             } catch (err) {
-                resultadoDiv.innerText = "Error de conexión.";
+                resDiv.innerText = "⚠️ Error de conexión con el servidor.";
             }
-        }
-
-        function mostrarAcordeon(texto) {
-            const resultadoDiv = document.getElementById('resultado');
-            resultadoDiv.innerHTML = "";
-            const secciones = texto.split(/\n\s*\n/);
-
-            secciones.forEach((sec, idx) => {
-                const lineas = sec.trim().split("\n");
-                let titulo = lineas[0].trim();
-                let contenido = lineas.slice(1).join("\n").trim();
-                if (!contenido) { contenido = titulo; titulo = "Sección " + (idx+1); }
-
-                const btn = document.createElement('div');
-                btn.className = 'acordeon';
-                btn.innerText = titulo;
-
-                const panel = document.createElement('div');
-                panel.className = 'panel';
-                panel.innerText = contenido;
-
-                if (acordeonEstados[titulo] === true) panel.style.display = 'block';
-
-                btn.addEventListener('click', () => {
-                    const abierto = panel.style.display === 'block';
-                    panel.style.display = abierto ? 'none' : 'block';
-                    acordeonEstados[titulo] = !abierto;
-                });
-
-                resultadoDiv.appendChild(btn);
-                resultadoDiv.appendChild(panel);
-            });
         }
     </script>
 </body>
