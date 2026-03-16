@@ -2,7 +2,7 @@ import os
 import logging
 import datetime
 import google.generativeai as genai
-from flask import Flask, request, jsonify, session, redirect, url_for
+from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from authlib.integrations.flask_client import OAuth
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
 
-# CORS: restringir a tu dominio en producciÃ³n
+# CORS: restringir a tu dominio en producción
 CORS(app, origins=os.environ.get("ALLOWED_ORIGINS", "*").split(","))
 
 app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
@@ -58,7 +58,6 @@ CONSULTAS_BASE = 5
 CONSULTAS_POR_AD = 5
 PERFIL_MAX = 1_000      # caracteres guardados en historial
 
-
 # ---------------------------------------------------------------------------
 # Modelo
 # ---------------------------------------------------------------------------
@@ -71,169 +70,107 @@ class Usuario(db.Model):
     material = db.Column(db.Text, default="")
     perfil_aprendizaje = db.Column(db.Text, default="")
 
-
 with app.app_context():
     db.create_all()
 
-
 # ---------------------------------------------------------------------------
-# Helpers
+# Rutas de navegación y Auth
 # ---------------------------------------------------------------------------
-def get_usuario_actual() -> Usuario | None:
-    """Devuelve el usuario autenticado o None."""
-    uid = session.get("usuario_id")
-    if uid is None:
-        return None
-    return db.session.get(Usuario, uid)
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-
-def resetear_si_nuevo_dia(u: Usuario) -> None:
-    """Resetea sÃ³lo las consultas diarias; los anuncios acumulan entre dÃ­as."""
-    ahora = datetime.datetime.utcnow()
-    if u.ultima_consulta and (ahora - u.ultima_consulta).total_seconds() > 86_400:
-        u.consultas_usadas = 0
-        # NO se resetea bloques_publicidad_vistos: el usuario conserva su crÃ©dito
-
-
-def consultas_permitidas(u: Usuario) -> int:
-    return CONSULTAS_BASE + u.bloques_publicidad_vistos * CONSULTAS_POR_AD
-
-
-def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario) -> str:
-    prompt = f"""
-Eres un docente universitario. Analiza al estudiante segÃºn su historial.
-Historial pedagÃ³gico: {usuario.perfil_aprendizaje}
-
-Contexto acadÃ©mico: {material}
-AcciÃ³n: {tarea}
-Estudiante: {texto}
-"""
-    try:
-        resp = model.generate_content(prompt)
-        res = resp.text if hasattr(resp, "text") else "Error en respuesta."
-
-        # FIX: [:1000] para conservar los ÃšLTIMOS (mÃ¡s recientes) registros
-        nueva_entrada = f"Q: {texto[:100]}... A: {res[:100]}..."
-        usuario.perfil_aprendizaje = (nueva_entrada + usuario.perfil_aprendizaje)[:PERFIL_MAX]
-
-        db.session.commit()
-        return res
-
-    except Exception as e:
-        logger.error("Error al llamar a Gemini: %s", e)
-        db.session.rollback()
-        return "Error en la conexiÃ³n con la IA. Intenta mÃ¡s tarde."
-
-
-# ---------------------------------------------------------------------------
-# Rutas de autenticaciÃ³n
-# ---------------------------------------------------------------------------
 @app.route("/login")
 def login():
     return google.authorize_redirect(url_for("callback", _external=True))
 
-
 @app.route("/callback")
 def callback():
     token = google.authorize_access_token()
-
-    # FIX: parse_id_token estÃ¡ deprecado en Authlib â‰¥ 1.0; usar userinfo
     userinfo = token.get("userinfo") or google.userinfo()
     email = userinfo["email"]
-
     u = Usuario.query.filter_by(email=email).first()
     if not u:
         u = Usuario(email=email)
         db.session.add(u)
-
     db.session.commit()
     session["usuario_id"] = u.id
     return redirect("/")
-
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
 
+# ---------------------------------------------------------------------------
+# Helpers y Lógica de IA
+# ---------------------------------------------------------------------------
+def get_usuario_actual() -> Usuario | None:
+    uid = session.get("usuario_id")
+    return db.session.get(Usuario, uid) if uid else None
+
+def resetear_si_nuevo_dia(u: Usuario) -> None:
+    ahora = datetime.datetime.utcnow()
+    if u.ultima_consulta and (ahora - u.ultima_consulta).total_seconds() > 86_400:
+        u.consultas_usadas = 0
+
+def consultas_permitidas(u: Usuario) -> int:
+    return CONSULTAS_BASE + u.bloques_publicidad_vistos * CONSULTAS_POR_AD
+
+def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario) -> str:
+    prompt = f"Eres un docente universitario. Historial: {usuario.perfil_aprendizaje}\nContexto: {material}\nAcción: {tarea}\nEstudiante: {texto}"
+    try:
+        resp = model.generate_content(prompt)
+        res = resp.text if hasattr(resp, "text") else "Error."
+        nueva_entrada = f"Q: {texto[:100]}... A: {res[:100]}..."
+        usuario.perfil_aprendizaje = (nueva_entrada + usuario.perfil_aprendizaje)[:PERFIL_MAX]
+        db.session.commit()
+        return res
+    except Exception as e:
+        logger.error("Error Gemini: %s", e)
+        db.session.rollback()
+        return "Error de conexión."
 
 # ---------------------------------------------------------------------------
-# Ruta principal de tareas (allowlist explÃ­cita)
+# Rutas de Tareas
 # ---------------------------------------------------------------------------
 @app.route("/<tarea>", methods=["POST"])
 def manejar_tarea(tarea: str):
-    # FIX: validar tarea contra allowlist antes de cualquier otra cosa
     if tarea not in TAREAS_VALIDAS:
-        return jsonify({"error": "Tarea invÃ¡lida"}), 400
-
+        return jsonify({"error": "Tarea inválida"}), 400
     u = get_usuario_actual()
     if not u:
         return jsonify({"error": "No autenticado"}), 401
-
-    # --- Manejo especial: cargar material (no consume consulta) ---
+    
     if tarea == "cargar_material":
         material = request.json.get("material", "")
-        # FIX: limitar tamaÃ±o del material
-        if len(material) > MAX_MATERIAL:
-            return jsonify({"error": f"Material demasiado largo (mÃ¡x {MAX_MATERIAL} caracteres)"}), 400
+        if len(material) > MAX_MATERIAL: return jsonify({"error": "Material muy largo"}), 400
         u.material = material
         db.session.commit()
         return jsonify({"res": "Material actualizado"})
 
-    # --- LÃ³gica de monetizaciÃ³n ---
     resetear_si_nuevo_dia(u)
-
     if u.consultas_usadas >= consultas_permitidas(u):
-        return jsonify({
-            "error": "Consultas agotadas. Mira un anuncio para obtener mÃ¡s.",
-            "consultas_usadas": u.consultas_usadas,
-            "consultas_permitidas": consultas_permitidas(u),
-        }), 403
+        return jsonify({"error": "Consultas agotadas."}), 403
 
-    # --- Validar input ---
     data = request.get_json(silent=True) or {}
     texto = data.get("texto", "").strip()
+    if not texto: return jsonify({"error": "Texto obligatorio"}), 400
+    if len(texto) > MAX_TEXTO: return jsonify({"error": "Texto muy largo"}), 400
 
-    if not texto:
-        return jsonify({"error": "El campo 'texto' es obligatorio"}), 400
-
-    # FIX: limitar longitud del texto enviado a la IA
-    if len(texto) > MAX_TEXTO:
-        return jsonify({"error": f"Texto demasiado largo (mÃ¡x {MAX_TEXTO} caracteres)"}), 400
-
-    # --- Ejecutar tarea ---
     res = ejecutar_tarea_ia(tarea, texto, u.material, u)
-
     u.consultas_usadas += 1
     u.ultima_consulta = datetime.datetime.utcnow()
     db.session.commit()
+    return jsonify({"resultado": res})
 
-    return jsonify({
-        "resultado": res,
-        "consultas_usadas": u.consultas_usadas,
-        "consultas_permitidas": consultas_permitidas(u),
-    })
-
-
-# ---------------------------------------------------------------------------
-# Ruta auxiliar: registrar anuncio visto
-# ---------------------------------------------------------------------------
 @app.route("/ver_anuncio", methods=["POST"])
 def ver_anuncio():
-    """El frontend llama a este endpoint tras mostrar un anuncio."""
     u = get_usuario_actual()
-    if not u:
-        return jsonify({"error": "No autenticado"}), 401
-
+    if not u: return jsonify({"error": "No autenticado"}), 401
     u.bloques_publicidad_vistos += 1
     db.session.commit()
-    return jsonify({
-        "res": "Anuncio registrado",
-        "consultas_extra": CONSULTAS_POR_AD,
-        "consultas_permitidas": consultas_permitidas(u),
-    })
+    return jsonify({"res": "Anuncio registrado"})
 
-
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
