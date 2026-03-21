@@ -69,8 +69,8 @@ if not api_key:
     raise ValueError("Falta la variable de entorno API_KEY")
 genai.configure(api_key=api_key)
 
-# LÍNEA CORREGIDA: Cambiado de 2.0 a 1.5 para mayor estabilidad de cuota
-model = genai.GenerativeModel("gemini-1.5-flash")
+# LÍNEA CORREGIDA: Usando el alias estable 'latest' para evitar errores de NotFound
+model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # ---------------------------------------------------------------------------
 # Constantes
@@ -281,4 +281,3 @@ def ver_anuncio():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-        
