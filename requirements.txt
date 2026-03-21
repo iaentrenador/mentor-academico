@@ -6,4 +6,5 @@ google-generativeai==0.8.0
 requests==2.31.0
 gunicorn==21.2.0
 python-dotenv==1.1.1
-psycopg2
+psycopg2-binary
+Flask-Mail==0.9.1
