@@ -6,7 +6,7 @@ from flask import Flask, request, jsonify, session, redirect, url_for, render_te
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from authlib.integrations.flask_client import OAuth
-from flask_mail import Mail, Message  # Nueva dependencia para correos
+from flask_mail import Mail, Message
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 # App & extensions
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
-
 CORS(app, origins=os.environ.get("ALLOWED_ORIGINS", "*").split(","))
 
 app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
@@ -28,12 +27,15 @@ app.config["SQLALCHEMY_DATABASE_URI"] = (
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+# Sesiones persistentes (para no loguearse cada vez)
+app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(days=7)
+
 # --- CONFIGURACIÓN DE CORREO OFICIAL ---
 app.config['MAIL_SERVER'] = os.environ.get("MAIL_SERVER", 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get("MAIL_PORT", 587))
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'acmementor.noreply@gmail.com' # Correo Oficial
-app.config['MAIL_PASSWORD'] = '5deseptiembre' # Contraseña integrada
+app.config['MAIL_USERNAME'] = 'acmementor.noreply@gmail.com'
+app.config['MAIL_PASSWORD'] = '5deseptiembre'
 mail = Mail(app)
 
 db = SQLAlchemy(app)
@@ -57,14 +59,14 @@ genai.configure(api_key=os.environ.get("API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ---------------------------------------------------------------------------
-# Constantes (Actualizadas para Alto Rendimiento V.A.L.F.)
+# Constantes
 # ---------------------------------------------------------------------------
 TAREAS_VALIDAS = {"explicar", "resumir", "evaluar", "cargar_material", "preparar_oratoria"}
-MAX_TEXTO = 15_000       # Subimos de 2k a 15k para textos largos
-MAX_MATERIAL = 50_000   # Subimos de 10k a 50k para PDFs completos
+MAX_TEXTO = 15_000       
+MAX_MATERIAL = 50_000   
 CONSULTAS_BASE = 5
 CONSULTAS_POR_AD = 5
-PERFIL_MAX = 2_000      # Aumentamos la memoria de contexto a 2k
+PERFIL_MAX = 2_000      
 
 # ---------------------------------------------------------------------------
 # Modelo
@@ -82,14 +84,33 @@ with app.app_context():
     db.create_all()
 
 # ---------------------------------------------------------------------------
-# Rutas de navegación y Auth
+# Helpers
+# ---------------------------------------------------------------------------
+def get_usuario_actual() -> Usuario | None:
+    uid = session.get("usuario_id")
+    return db.session.get(Usuario, uid) if uid else None
+
+def resetear_si_nuevo_dia(u: Usuario) -> None:
+    ahora = datetime.datetime.utcnow()
+    if u.ultima_consulta and (ahora - u.ultima_consulta).total_seconds() > 86_400:
+        u.consultas_usadas = 0
+        db.session.commit()
+
+def consultas_permitidas(u: Usuario) -> int:
+    return CONSULTAS_BASE + u.bloques_publicidad_vistos * CONSULTAS_POR_AD
+
+# ---------------------------------------------------------------------------
+# Rutas de navegación y Auth (MEJORADO)
 # ---------------------------------------------------------------------------
 @app.route("/")
 def index():
-    return render_template("index.html")
+    u = get_usuario_actual()
+    return render_template("index.html", usuario=u)
 
 @app.route("/login")
 def login():
+    if get_usuario_actual():
+        return redirect(url_for("index"))
     return google.authorize_redirect(url_for("callback", _external=True))
 
 @app.route("/callback")
@@ -103,6 +124,7 @@ def callback():
         db.session.add(u)
     db.session.commit()
     session["usuario_id"] = u.id
+    session.permanent = True # Mantiene la sesión activa según el tiempo configurado
     return redirect("/")
 
 @app.route("/logout")
@@ -111,40 +133,32 @@ def logout():
     return redirect("/")
 
 # ---------------------------------------------------------------------------
-# Helpers y Lógica de IA con Perfiles de Materia
+# API: Info de Usuario (Para el contador en el Front)
 # ---------------------------------------------------------------------------
-def get_usuario_actual() -> Usuario | None:
-    uid = session.get("usuario_id")
-    return db.session.get(Usuario, uid) if uid else None
+@app.route("/api/usuario")
+def info_usuario():
+    u = get_usuario_actual()
+    if not u:
+        return jsonify({"logueado": False})
+    resetear_si_nuevo_dia(u)
+    permitidas = consultas_permitidas(u)
+    return jsonify({
+        "logueado": True,
+        "email": u.email,
+        "restantes": permitidas - u.consultas_usadas
+    })
 
-def resetear_si_nuevo_dia(u: Usuario) -> None:
-    ahora = datetime.datetime.utcnow()
-    if u.ultima_consulta and (ahora - u.ultima_consulta).total_seconds() > 86_400:
-        u.consultas_usadas = 0
-
-def consultas_permitidas(u: Usuario) -> int:
-    return CONSULTAS_BASE + u.bloques_publicidad_vistos * CONSULTAS_POR_AD
-
-def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, materia: str = "general") -> str:
-    # --- Lógica de Prompts por Materia (Perfiles V.A.L.F.) ---
+# ---------------------------------------------------------------------------
+# IA Logic (CON PROTECCIÓN DE CONSULTAS)
+# ---------------------------------------------------------------------------
+def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, materia: str = "general"):
     perfil_materia = ""
     if materia == "higiene":
-        perfil_materia = (
-            "ROL: Inspector Técnico de Higiene y Seguridad. REGLA: Si el alumno no cita Ley/Año (ej. 19587/72) "
-            "o no utiliza conceptos de la Tríada Ecológica (Agente-Huésped-Ambiente), debes rechazar la respuesta "
-            "amablemente indicando la falta de rigor legal."
-        )
+        perfil_materia = "ROL: Inspector Técnico de Higiene y Seguridad. REGLA: Exige rigor legal (Ley 19587/72)."
     elif materia == "matematica":
-        perfil_materia = (
-            "ROL: Tutor de Matemática UPE. REGLA: Explica paso a paso. Para ejercicios de cálculo, genera "
-            "un MODELO SIMILAR (no el mismo) y detalla exactamente qué TECLAS de la calculadora científica "
-            "debe tocar el alumno (ej: [EXP], [x10^x], [SHIFT]+[LOG])."
-        )
+        perfil_materia = "ROL: Tutor de Matemática UPE. Explica pasos y teclas de calculadora."
     elif materia == "politica":
-        perfil_materia = (
-            "ROL: Mentor de Oratoria y Política. REGLA: Prepara guiones para exposiciones virtuales. "
-            "Enfócate en conceptos de Estado, Poder y el programa total de la materia."
-        )
+        perfil_materia = "ROL: Mentor de Oratoria y Política. Enfócate en conceptos de Estado y Poder."
 
     prompt = (
         f"Eres el Mentor Académico. {perfil_materia}\n"
@@ -156,19 +170,17 @@ def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, m
 
     try:
         resp = model.generate_content(prompt)
-        res = resp.text if hasattr(resp, "text") else "Error en respuesta."
-        nueva_entrada = f"Q: {texto[:50]}... A: {res[:50]}..."
-        usuario.perfil_aprendizaje = (nueva_entrada + usuario.perfil_aprendizaje)[:PERFIL_MAX]
-        db.session.commit()
-        return res
+        if hasattr(resp, "text"):
+            res = resp.text
+            nueva_entrada = f"Q: {texto[:50]}... A: {res[:50]}..."
+            usuario.perfil_aprendizaje = (nueva_entrada + usuario.perfil_aprendizaje)[:PERFIL_MAX]
+            # No hacemos commit aquí, lo hacemos en manejar_tarea solo si hay éxito
+            return res
+        return None
     except Exception as e:
         logger.error("Error Gemini: %s", e)
-        db.session.rollback()
-        return "Error de conexión con la IA."
+        return None
 
-# ---------------------------------------------------------------------------
-# Rutas de Tareas y Nuevas Funciones
-# ---------------------------------------------------------------------------
 @app.route("/<tarea>", methods=["POST"])
 def manejar_tarea(tarea: str):
     if tarea not in TAREAS_VALIDAS:
@@ -185,53 +197,57 @@ def manejar_tarea(tarea: str):
         return jsonify({"res": "Material actualizado"})
 
     resetear_si_nuevo_dia(u)
-    if u.consultas_usadas >= consultas_permitidas(u):
-        return jsonify({"error": "Consultas agotadas."}), 403
+    permitidas = consultas_permitidas(u)
+    if u.consultas_usadas >= permitidas:
+        return jsonify({"error": "Consultas agotadas por hoy."}), 403
 
     data = request.get_json(silent=True) or {}
     texto = data.get("texto", "").strip()
-    materia = data.get("materia", "general") # Captura la materia seleccionada en el front
+    materia = data.get("materia", "general")
     
     if not texto: return jsonify({"error": "Texto obligatorio"}), 400
     if len(texto) > MAX_TEXTO: return jsonify({"error": "Texto muy largo"}), 400
 
+    # EJECUCIÓN: Primero intentamos con la IA
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia)
+    
+    if res is None:
+        # FALLÓ LA CONEXIÓN: No se descuenta la consulta
+        return jsonify({"error": "Error de conexión con la IA. No se descontó tu consulta. Intenta de nuevo."}), 503
+
+    # ÉXITO: Recién aquí descontamos la consulta y guardamos todo
     u.consultas_usadas += 1
     u.ultima_consulta = datetime.datetime.utcnow()
     db.session.commit()
-    return jsonify({"resultado": res})
+    
+    return jsonify({
+        "resultado": res,
+        "restantes": permitidas - u.consultas_usadas
+    })
 
 # --- RUTA: NOTIFICACIÓN DE EXAMEN ---
 @app.route("/configurar_examen", methods=["POST"])
 def configurar_examen():
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
-    
     data = request.get_json()
     materia = data.get("materia")
     fecha = data.get("fecha")
-    email_destino = data.get("email", u.email)
-    
     try:
         msg = Message(f"Recordatorio de Examen: {materia}",
                       sender=app.config['MAIL_USERNAME'],
-                      recipients=[email_destino])
-        msg.body = f"Hola!\n\nTu Mentor Académico te recuerda tu fecha de examen/entrega para {materia}.\nFecha: {fecha}\n\n¡Muchos éxitos!"
+                      recipients=[u.email])
+        msg.body = f"Hola!\n\nTu Mentor Académico te recuerda tu fecha de examen para {materia}.\nFecha: {fecha}\n\n¡Éxitos!"
         mail.send(msg)
         return jsonify({"res": "Notificación enviada"})
     except Exception as e:
         logger.error("Error Mail: %s", e)
         return jsonify({"error": "Error al enviar correo"}), 500
 
-# --- RUTA: TIENDA FANTASMA ---
 @app.route("/tienda")
 def tienda():
-    mensaje = "Función en desarrollo. Estamos ajustando los packs de consultas según costos de API e Inflación en Argentina."
-    return jsonify({
-        "status": "proximamente",
-        "mensaje": mensaje,
-        "opciones": ["Pack Parcialito", "Pack Promoción", "Pack Final"]
-    })
+    mensaje = "Función en desarrollo. Estamos ajustando los packs."
+    return jsonify({"status": "proximamente", "mensaje": mensaje, "opciones": ["Pack Parcialito", "Pack Final"]})
 
 @app.route("/ver_anuncio", methods=["POST"])
 def ver_anuncio():
@@ -239,8 +255,8 @@ def ver_anuncio():
     if not u: return jsonify({"error": "No autenticado"}), 401
     u.bloques_publicidad_vistos += 1
     db.session.commit()
-    return jsonify({"res": "Anuncio registrado"})
+    return jsonify({"res": "Anuncio registrado", "restantes": consultas_permitidas(u) - u.consultas_usadas})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-    
+        
