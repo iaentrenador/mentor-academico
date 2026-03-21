@@ -2,10 +2,11 @@ import os
 import logging
 import datetime
 import google.generativeai as genai
-from flask import Flask, request, jsonify, session, redirect, url_for, render_template
+from flask import Flask, request, jsonify, session, redirect, url_for, render_template, flash
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from authlib.integrations.flask_client import OAuth
+from flask_mail import Mail, Message  # Nueva dependencia para correos
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -18,7 +19,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
 
-# CORS: restringir a tu dominio en producción
 CORS(app, origins=os.environ.get("ALLOWED_ORIGINS", "*").split(","))
 
 app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
@@ -27,6 +27,14 @@ app.config["SQLALCHEMY_DATABASE_URI"] = (
     .replace("postgres://", "postgresql://", 1)
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# --- CONFIGURACIÓN DE CORREO OFICIAL ---
+app.config['MAIL_SERVER'] = os.environ.get("MAIL_SERVER", 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get("MAIL_PORT", 587))
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'acmementor.noreply@gmail.com' # Correo Oficial
+app.config['MAIL_PASSWORD'] = '5deseptiembre' # Contraseña integrada
+mail = Mail(app)
 
 db = SQLAlchemy(app)
 
@@ -51,12 +59,12 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 # ---------------------------------------------------------------------------
 # Constantes
 # ---------------------------------------------------------------------------
-TAREAS_VALIDAS = {"explicar", "resumir", "evaluar", "cargar_material"}
-MAX_TEXTO = 2_000       # caracteres
-MAX_MATERIAL = 10_000   # caracteres
+TAREAS_VALIDAS = {"explicar", "resumir", "evaluar", "cargar_material", "preparar_oratoria"}
+MAX_TEXTO = 2_000       
+MAX_MATERIAL = 10_000   
 CONSULTAS_BASE = 5
 CONSULTAS_POR_AD = 5
-PERFIL_MAX = 1_000      # caracteres guardados en historial
+PERFIL_MAX = 1_000      
 
 # ---------------------------------------------------------------------------
 # Modelo
@@ -103,7 +111,7 @@ def logout():
     return redirect("/")
 
 # ---------------------------------------------------------------------------
-# Helpers y Lógica de IA
+# Helpers y Lógica de IA con Perfiles de Materia
 # ---------------------------------------------------------------------------
 def get_usuario_actual() -> Usuario | None:
     uid = session.get("usuario_id")
@@ -117,22 +125,49 @@ def resetear_si_nuevo_dia(u: Usuario) -> None:
 def consultas_permitidas(u: Usuario) -> int:
     return CONSULTAS_BASE + u.bloques_publicidad_vistos * CONSULTAS_POR_AD
 
-def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario) -> str:
-    prompt = f"Eres un docente universitario. Historial: {usuario.perfil_aprendizaje}\nContexto: {material}\nAcción: {tarea}\nEstudiante: {texto}"
+def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, materia: str = "general") -> str:
+    # --- Lógica de Prompts por Materia (Perfiles V.A.L.F.) ---
+    perfil_materia = ""
+    if materia == "higiene":
+        perfil_materia = (
+            "ROL: Inspector Técnico de Higiene y Seguridad. REGLA: Si el alumno no cita Ley/Año (ej. 19587/72) "
+            "o no utiliza conceptos de la Tríada Ecológica (Agente-Huésped-Ambiente), debes rechazar la respuesta "
+            "amablemente indicando la falta de rigor legal."
+        )
+    elif materia == "matematica":
+        perfil_materia = (
+            "ROL: Tutor de Matemática UPE. REGLA: Explica paso a paso. Para ejercicios de cálculo, genera "
+            "un MODELO SIMILAR (no el mismo) y detalla exactamente qué TECLAS de la calculadora científica "
+            "debe tocar el alumno (ej: [EXP], [x10^x], [SHIFT]+[LOG])."
+        )
+    elif materia == "politica":
+        perfil_materia = (
+            "ROL: Mentor de Oratoria y Política. REGLA: Prepara guiones para exposiciones virtuales. "
+            "Enfócate en conceptos de Estado, Poder y el programa total de la materia."
+        )
+
+    prompt = (
+        f"Eres el Mentor Académico. {perfil_materia}\n"
+        f"Historial del alumno: {usuario.perfil_aprendizaje}\n"
+        f"Contexto/Material: {material}\n"
+        f"Acción: {tarea}\n"
+        f"Entrada del Estudiante: {texto}"
+    )
+
     try:
         resp = model.generate_content(prompt)
-        res = resp.text if hasattr(resp, "text") else "Error."
-        nueva_entrada = f"Q: {texto[:100]}... A: {res[:100]}..."
+        res = resp.text if hasattr(resp, "text") else "Error en respuesta."
+        nueva_entrada = f"Q: {texto[:50]}... A: {res[:50]}..."
         usuario.perfil_aprendizaje = (nueva_entrada + usuario.perfil_aprendizaje)[:PERFIL_MAX]
         db.session.commit()
         return res
     except Exception as e:
         logger.error("Error Gemini: %s", e)
         db.session.rollback()
-        return "Error de conexión."
+        return "Error de conexión con la IA."
 
 # ---------------------------------------------------------------------------
-# Rutas de Tareas
+# Rutas de Tareas y Nuevas Funciones
 # ---------------------------------------------------------------------------
 @app.route("/<tarea>", methods=["POST"])
 def manejar_tarea(tarea: str):
@@ -155,14 +190,48 @@ def manejar_tarea(tarea: str):
 
     data = request.get_json(silent=True) or {}
     texto = data.get("texto", "").strip()
+    materia = data.get("materia", "general") # Captura la materia seleccionada en el front
+    
     if not texto: return jsonify({"error": "Texto obligatorio"}), 400
     if len(texto) > MAX_TEXTO: return jsonify({"error": "Texto muy largo"}), 400
 
-    res = ejecutar_tarea_ia(tarea, texto, u.material, u)
+    res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia)
     u.consultas_usadas += 1
     u.ultima_consulta = datetime.datetime.utcnow()
     db.session.commit()
     return jsonify({"resultado": res})
+
+# --- RUTA: NOTIFICACIÓN DE EXAMEN ---
+@app.route("/configurar_examen", methods=["POST"])
+def configurar_examen():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    
+    data = request.get_json()
+    materia = data.get("materia")
+    fecha = data.get("fecha")
+    email_destino = data.get("email", u.email)
+    
+    try:
+        msg = Message(f"Recordatorio de Examen: {materia}",
+                      sender=app.config['MAIL_USERNAME'],
+                      recipients=[email_destino])
+        msg.body = f"Hola!\n\nTu Mentor Académico te recuerda tu fecha de examen/entrega para {materia}.\nFecha: {fecha}\n\n¡Muchos éxitos!"
+        mail.send(msg)
+        return jsonify({"res": "Notificación enviada"})
+    except Exception as e:
+        logger.error("Error Mail: %s", e)
+        return jsonify({"error": "Error al enviar correo"}), 500
+
+# --- RUTA: TIENDA FANTASMA ---
+@app.route("/tienda")
+def tienda():
+    mensaje = "Función en desarrollo. Estamos ajustando los packs de consultas según costos de API e Inflación en Argentina."
+    return jsonify({
+        "status": "proximamente",
+        "mensaje": mensaje,
+        "opciones": ["Pack Parcialito", "Pack Promoción", "Pack Final"]
+    })
 
 @app.route("/ver_anuncio", methods=["POST"])
 def ver_anuncio():
@@ -174,3 +243,4 @@ def ver_anuncio():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+        
