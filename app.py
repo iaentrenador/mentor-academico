@@ -57,14 +57,14 @@ genai.configure(api_key=os.environ.get("API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ---------------------------------------------------------------------------
-# Constantes
+# Constantes (Actualizadas para Alto Rendimiento V.A.L.F.)
 # ---------------------------------------------------------------------------
 TAREAS_VALIDAS = {"explicar", "resumir", "evaluar", "cargar_material", "preparar_oratoria"}
-MAX_TEXTO = 2_000       
-MAX_MATERIAL = 10_000   
+MAX_TEXTO = 15_000       # Subimos de 2k a 15k para textos largos
+MAX_MATERIAL = 50_000   # Subimos de 10k a 50k para PDFs completos
 CONSULTAS_BASE = 5
 CONSULTAS_POR_AD = 5
-PERFIL_MAX = 1_000      
+PERFIL_MAX = 2_000      # Aumentamos la memoria de contexto a 2k
 
 # ---------------------------------------------------------------------------
 # Modelo
@@ -243,4 +243,4 @@ def ver_anuncio():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-        
+    
