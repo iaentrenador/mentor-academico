@@ -23,6 +23,9 @@
         .materia-selector { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; justify-content: center; }
         select { padding: 8px; border-radius: 8px; border: 2px solid #3498db; outline: none; }
 
+        /* Nota de sugerencia */
+        .tip-box { background: #e8f4fd; color: #2980b9; padding: 10px; border-radius: 8px; font-size: 0.85em; margin-bottom: 10px; border-left: 4px solid #3498db; }
+
         textarea { width: 100%; height: 180px; padding: 12px; border: 2px solid #ddd; border-radius: 10px; box-sizing: border-box; font-size: 16px; }
         
         .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 15px; }
@@ -63,6 +66,10 @@
                 <option value="matematica">Matemática (Cálculo/Kenko)</option>
                 <option value="politica">Política y Sociedad (Oratoria)</option>
             </select>
+        </div>
+
+        <div class="tip-box">
+            💡 <b>Tip:</b> Si tu texto es muy largo, usa primero <b>Guardar Material</b>. Luego podrás pedir resúmenes o explicaciones sobre ese contenido guardado.
         </div>
         
         <textarea id="texto" placeholder="Pega aquí tu material o tu pregunta..."></textarea>
