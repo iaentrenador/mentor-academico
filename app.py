@@ -68,21 +68,22 @@ api_key = os.environ.get("API_KEY")
 if not api_key:
     raise ValueError("Falta la variable de entorno API_KEY")
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-2.0-flash")
+
+# LÍNEA CORREGIDA: Cambiado de 2.0 a 1.5 para mayor estabilidad de cuota
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ---------------------------------------------------------------------------
 # Constantes
 # ---------------------------------------------------------------------------
-# FIX: Tareas como dict de perfiles en vez de set plano, más extensible
 TAREAS_VALIDAS = {"explicar", "resumir", "evaluar", "cargar_material", "preparar_oratoria"}
 MAX_TEXTO = 15_000
 MAX_MATERIAL = 50_000
 CONSULTAS_BASE = 5
 CONSULTAS_POR_AD = 5
-MAX_BLOQUES_PUBLICIDAD = 2   # FIX: Límite de 2 bloques = 10 consultas extra máximo por día
+MAX_BLOQUES_PUBLICIDAD = 2   
 PERFIL_MAX = 2_000
 
-# FIX: Perfiles de materia como diccionario en vez de if/elif
+# Perfiles de materia como diccionario
 PERFILES_MATERIA = {
     "higiene": "ROL: Inspector Técnico de Higiene y Seguridad. REGLA: Exige rigor legal (Ley 19587/72).",
     "matematica": "ROL: Tutor de Matemática UPE. Explica pasos y teclas de calculadora.",
@@ -115,7 +116,7 @@ def resetear_si_nuevo_dia(u: Usuario) -> None:
     ahora = datetime.datetime.utcnow()
     if u.ultima_consulta and (ahora - u.ultima_consulta).total_seconds() > 86_400:
         u.consultas_usadas = 0
-        u.bloques_publicidad_vistos = 0  # FIX: También resetea los bloques de publicidad al nuevo día
+        u.bloques_publicidad_vistos = 0  
         db.session.commit()
 
 def consultas_permitidas(u: Usuario) -> int:
@@ -146,7 +147,7 @@ def callback():
         db.session.add(u)
     db.session.commit()
     session["usuario_id"] = u.id
-    session.permanent = True  # Mantiene la sesión activa según el tiempo configurado
+    session.permanent = True  
     return redirect("/")
 
 @app.route("/logout")
@@ -174,7 +175,6 @@ def info_usuario():
 # IA Logic (CON PROTECCIÓN DE CONSULTAS)
 # ---------------------------------------------------------------------------
 def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, materia: str = "general"):
-    # FIX: Perfil de materia desde diccionario en vez de if/elif
     perfil_materia = PERFILES_MATERIA.get(materia, "")
 
     prompt = (
@@ -191,11 +191,9 @@ def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, m
             res = resp.text
             nueva_entrada = f"Q: {texto[:50]}... A: {res[:50]}..."
             usuario.perfil_aprendizaje = (nueva_entrada + usuario.perfil_aprendizaje)[:PERFIL_MAX]
-            # No hacemos commit aquí, lo hacemos en manejar_tarea solo si hay éxito
             return res
         return None
     except Exception as e:
-        # FIX: Log con repr para ver el error completo de Gemini en los logs del servidor
         logger.error("Error Gemini completo: %s", repr(e))
         return None
 
@@ -207,7 +205,6 @@ def manejar_tarea(tarea: str):
     if not u:
         return jsonify({"error": "No autenticado"}), 401
 
-    # FIX: cargar_material usa la clave "material" que manda el frontend corregido
     if tarea == "cargar_material":
         material = request.json.get("material", "")
         if len(material) > MAX_MATERIAL:
@@ -230,14 +227,11 @@ def manejar_tarea(tarea: str):
     if len(texto) > MAX_TEXTO:
         return jsonify({"error": "Texto muy largo"}), 400
 
-    # EJECUCIÓN: Primero intentamos con la IA
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia)
 
     if res is None:
-        # FALLÓ LA CONEXIÓN: No se descuenta la consulta
         return jsonify({"error": "Error de conexión con la IA. No se descontó tu consulta. Intenta de nuevo."}), 503
 
-    # ÉXITO: Recién aquí descontamos la consulta y guardamos todo
     u.consultas_usadas += 1
     u.ultima_consulta = datetime.datetime.utcnow()
     db.session.commit()
@@ -278,7 +272,6 @@ def ver_anuncio():
     if not u:
         return jsonify({"error": "No autenticado"}), 401
 
-    # FIX: Límite de 2 bloques por día (5 consultas base + 5 + 5 = 15 máximo diario)
     if u.bloques_publicidad_vistos >= MAX_BLOQUES_PUBLICIDAD:
         return jsonify({"error": "Ya obtuviste el máximo de consultas extra por hoy. Volvé mañana."}), 403
 
@@ -288,3 +281,4 @@ def ver_anuncio():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+        
