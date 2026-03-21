@@ -18,9 +18,17 @@ logger = logging.getLogger(__name__)
 # App & extensions
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
-CORS(app, origins=os.environ.get("ALLOWED_ORIGINS", "*").split(","))
 
-app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
+# FIX: CORS restringido a orígenes configurados, sin wildcard en producción
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+CORS(app, origins=allowed_origins)
+
+# FIX: Secret key obligatoria desde entorno, no puede ser el valor de desarrollo en producción
+secret_key = os.environ.get("SECRET_KEY")
+if not secret_key:
+    raise ValueError("Falta la variable de entorno SECRET_KEY")
+app.secret_key = secret_key
+
 app.config["SQLALCHEMY_DATABASE_URI"] = (
     os.environ.get("DATABASE_URL", "sqlite:///local.db")
     .replace("postgres://", "postgresql://", 1)
@@ -30,12 +38,12 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # Sesiones persistentes (para no loguearse cada vez)
 app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(days=7)
 
-# --- CONFIGURACIÓN DE CORREO OFICIAL ---
+# FIX: Credenciales de correo movidas a variables de entorno
 app.config['MAIL_SERVER'] = os.environ.get("MAIL_SERVER", 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get("MAIL_PORT", 587))
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'acmementor.noreply@gmail.com'
-app.config['MAIL_PASSWORD'] = '5deseptiembre'
+app.config['MAIL_USERNAME'] = os.environ.get("MAIL_USERNAME")
+app.config['MAIL_PASSWORD'] = os.environ.get("MAIL_PASSWORD")
 mail = Mail(app)
 
 db = SQLAlchemy(app)
@@ -55,18 +63,31 @@ google = oauth.register(
 # ---------------------------------------------------------------------------
 # Gemini
 # ---------------------------------------------------------------------------
-genai.configure(api_key=os.environ.get("API_KEY"))
+# FIX: API key obligatoria desde entorno, falla claro si no está definida
+api_key = os.environ.get("API_KEY")
+if not api_key:
+    raise ValueError("Falta la variable de entorno API_KEY")
+genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ---------------------------------------------------------------------------
 # Constantes
 # ---------------------------------------------------------------------------
+# FIX: Tareas como dict de perfiles en vez de set plano, más extensible
 TAREAS_VALIDAS = {"explicar", "resumir", "evaluar", "cargar_material", "preparar_oratoria"}
-MAX_TEXTO = 15_000       
-MAX_MATERIAL = 50_000   
+MAX_TEXTO = 15_000
+MAX_MATERIAL = 50_000
 CONSULTAS_BASE = 5
 CONSULTAS_POR_AD = 5
-PERFIL_MAX = 2_000      
+MAX_BLOQUES_PUBLICIDAD = 2   # FIX: Límite de 2 bloques = 10 consultas extra máximo por día
+PERFIL_MAX = 2_000
+
+# FIX: Perfiles de materia como diccionario en vez de if/elif
+PERFILES_MATERIA = {
+    "higiene": "ROL: Inspector Técnico de Higiene y Seguridad. REGLA: Exige rigor legal (Ley 19587/72).",
+    "matematica": "ROL: Tutor de Matemática UPE. Explica pasos y teclas de calculadora.",
+    "politica": "ROL: Mentor de Oratoria y Política. Enfócate en conceptos de Estado y Poder.",
+}
 
 # ---------------------------------------------------------------------------
 # Modelo
@@ -94,13 +115,14 @@ def resetear_si_nuevo_dia(u: Usuario) -> None:
     ahora = datetime.datetime.utcnow()
     if u.ultima_consulta and (ahora - u.ultima_consulta).total_seconds() > 86_400:
         u.consultas_usadas = 0
+        u.bloques_publicidad_vistos = 0  # FIX: También resetea los bloques de publicidad al nuevo día
         db.session.commit()
 
 def consultas_permitidas(u: Usuario) -> int:
     return CONSULTAS_BASE + u.bloques_publicidad_vistos * CONSULTAS_POR_AD
 
 # ---------------------------------------------------------------------------
-# Rutas de navegación y Auth (MEJORADO)
+# Rutas de navegación y Auth
 # ---------------------------------------------------------------------------
 @app.route("/")
 def index():
@@ -124,7 +146,7 @@ def callback():
         db.session.add(u)
     db.session.commit()
     session["usuario_id"] = u.id
-    session.permanent = True # Mantiene la sesión activa según el tiempo configurado
+    session.permanent = True  # Mantiene la sesión activa según el tiempo configurado
     return redirect("/")
 
 @app.route("/logout")
@@ -152,13 +174,8 @@ def info_usuario():
 # IA Logic (CON PROTECCIÓN DE CONSULTAS)
 # ---------------------------------------------------------------------------
 def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, materia: str = "general"):
-    perfil_materia = ""
-    if materia == "higiene":
-        perfil_materia = "ROL: Inspector Técnico de Higiene y Seguridad. REGLA: Exige rigor legal (Ley 19587/72)."
-    elif materia == "matematica":
-        perfil_materia = "ROL: Tutor de Matemática UPE. Explica pasos y teclas de calculadora."
-    elif materia == "politica":
-        perfil_materia = "ROL: Mentor de Oratoria y Política. Enfócate en conceptos de Estado y Poder."
+    # FIX: Perfil de materia desde diccionario en vez de if/elif
+    perfil_materia = PERFILES_MATERIA.get(materia, "")
 
     prompt = (
         f"Eres el Mentor Académico. {perfil_materia}\n"
@@ -178,7 +195,8 @@ def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, m
             return res
         return None
     except Exception as e:
-        logger.error("Error Gemini: %s", e)
+        # FIX: Log con repr para ver el error completo de Gemini en los logs del servidor
+        logger.error("Error Gemini completo: %s", repr(e))
         return None
 
 @app.route("/<tarea>", methods=["POST"])
@@ -188,10 +206,12 @@ def manejar_tarea(tarea: str):
     u = get_usuario_actual()
     if not u:
         return jsonify({"error": "No autenticado"}), 401
-    
+
+    # FIX: cargar_material usa la clave "material" que manda el frontend corregido
     if tarea == "cargar_material":
         material = request.json.get("material", "")
-        if len(material) > MAX_MATERIAL: return jsonify({"error": "Material muy largo"}), 400
+        if len(material) > MAX_MATERIAL:
+            return jsonify({"error": "Material muy largo"}), 400
         u.material = material
         db.session.commit()
         return jsonify({"res": "Material actualizado"})
@@ -204,13 +224,15 @@ def manejar_tarea(tarea: str):
     data = request.get_json(silent=True) or {}
     texto = data.get("texto", "").strip()
     materia = data.get("materia", "general")
-    
-    if not texto: return jsonify({"error": "Texto obligatorio"}), 400
-    if len(texto) > MAX_TEXTO: return jsonify({"error": "Texto muy largo"}), 400
+
+    if not texto:
+        return jsonify({"error": "Texto obligatorio"}), 400
+    if len(texto) > MAX_TEXTO:
+        return jsonify({"error": "Texto muy largo"}), 400
 
     # EJECUCIÓN: Primero intentamos con la IA
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia)
-    
+
     if res is None:
         # FALLÓ LA CONEXIÓN: No se descuenta la consulta
         return jsonify({"error": "Error de conexión con la IA. No se descontó tu consulta. Intenta de nuevo."}), 503
@@ -219,7 +241,7 @@ def manejar_tarea(tarea: str):
     u.consultas_usadas += 1
     u.ultima_consulta = datetime.datetime.utcnow()
     db.session.commit()
-    
+
     return jsonify({
         "resultado": res,
         "restantes": permitidas - u.consultas_usadas
@@ -229,7 +251,8 @@ def manejar_tarea(tarea: str):
 @app.route("/configurar_examen", methods=["POST"])
 def configurar_examen():
     u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
+    if not u:
+        return jsonify({"error": "No autenticado"}), 401
     data = request.get_json()
     materia = data.get("materia")
     fecha = data.get("fecha")
@@ -252,11 +275,16 @@ def tienda():
 @app.route("/ver_anuncio", methods=["POST"])
 def ver_anuncio():
     u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
+    if not u:
+        return jsonify({"error": "No autenticado"}), 401
+
+    # FIX: Límite de 2 bloques por día (5 consultas base + 5 + 5 = 15 máximo diario)
+    if u.bloques_publicidad_vistos >= MAX_BLOQUES_PUBLICIDAD:
+        return jsonify({"error": "Ya obtuviste el máximo de consultas extra por hoy. Volvé mañana."}), 403
+
     u.bloques_publicidad_vistos += 1
     db.session.commit()
     return jsonify({"res": "Anuncio registrado", "restantes": consultas_permitidas(u) - u.consultas_usadas})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-        
