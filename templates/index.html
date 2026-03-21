@@ -68,6 +68,7 @@
             
             {% if usuario %}
                 <div class="status-badge">⚡ Consultas: <span id="contador-consultas">...</span></div>
+                <button class="btn-nav" style="background: #27ae60; color: white;" onclick="verPublicidad()">📺 +5 Consultas</button>
                 <a href="/logout" class="btn-nav btn-logout">🚪 Salir</a>
             {% else %}
                 <a href="/login" class="btn-nav btn-login">🔑 Entrar</a>
@@ -159,6 +160,32 @@
                 }
             } catch (err) {
                 resDiv.innerText = "⚠️ Error de conexión con el servidor. Verifica tu señal o el estado de la app.";
+            }
+        }
+
+        async function verPublicidad() {
+            if(!confirm("¿Deseas ver un anuncio para obtener 5 consultas extra?")) return;
+            
+            const resDiv = document.getElementById('resultado');
+            resDiv.innerText = "Cargando anuncio... (Simulación V.A.L.F.)";
+            
+            try {
+                const response = await fetch('/ver_anuncio', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                
+                if (data.res) {
+                    alert("✅ ¡Felicidades! Se han sumado 5 consultas a tu cuenta.");
+                    const contador = document.getElementById('contador-consultas');
+                    if(contador) contador.innerText = data.restantes;
+                    resDiv.innerText = "Consultas actualizadas correctamente.";
+                } else {
+                    alert("Error: " + data.error);
+                }
+            } catch (err) {
+                alert("Error al conectar con el servidor de anuncios.");
             }
         }
 
