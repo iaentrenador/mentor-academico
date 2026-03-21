@@ -131,17 +131,24 @@
             const materia = document.getElementById('materia').value;
             const resDiv = document.getElementById('resultado');
             const contador = document.getElementById('contador-consultas');
-            
-            if (tarea !== 'cargar_material' && !texto) return alert("Ingresa contenido primero.");
+
+            // FIX: Validación específica para cada caso
+            if (tarea === 'cargar_material' && !texto) {
+                return alert("Pegá el material antes de guardarlo.");
+            }
+            if (tarea !== 'cargar_material' && !texto) {
+                return alert("Ingresa contenido primero.");
+            }
+
             resDiv.innerText = "Pensando como experto...";
 
             try {
-                const payload = { 
-                    texto: texto, 
-                    material: tarea === 'cargar_material' ? texto : undefined,
-                    materia: materia 
-                };
-                
+                // FIX: cargar_material manda el texto bajo la clave "material"
+                // Las demás tareas mandan "texto" y "materia" normalmente
+                const payload = tarea === 'cargar_material'
+                    ? { material: texto }
+                    : { texto: texto, materia: materia };
+
                 const response = await fetch(`/${tarea}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -163,29 +170,52 @@
             }
         }
 
+        // FIX: La publicidad ahora abre el anuncio real y espera 15 segundos antes de sumar consultas
         async function verPublicidad() {
             if(!confirm("¿Deseas ver un anuncio para obtener 5 consultas extra?")) return;
-            
+
             const resDiv = document.getElementById('resultado');
-            resDiv.innerText = "Cargando anuncio... (Simulación V.A.L.F.)";
-            
+
+            // Abre el anuncio en pestaña nueva
+            window.open('https://www.profitablecpmratenetwork.com/n2r78m21y?key=53d8cbd50aefa22ac6dd367853c1809e', '_blank');
+
+            // Muestra temporizador de 15 segundos
+            let segundos = 15;
+            resDiv.innerHTML = `⏳ Viendo anuncio... Aguardá <b><span id="timer">${segundos}</span> segundos</b> para recibir tus consultas.`;
+
+            const intervalo = setInterval(() => {
+                segundos--;
+                const timerEl = document.getElementById('timer');
+                if(timerEl) timerEl.innerText = segundos;
+
+                if(segundos <= 0) {
+                    clearInterval(intervalo);
+                    registrarAnuncio(); // Recién acá llama al backend
+                }
+            }, 1000);
+        }
+
+        // FIX: Separada del botón, se llama solo cuando termina el temporizador
+        async function registrarAnuncio() {
+            const resDiv = document.getElementById('resultado');
+            resDiv.innerText = "Verificando anuncio...";
+
             try {
                 const response = await fetch('/ver_anuncio', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const data = await response.json();
-                
-                if (data.res) {
-                    alert("✅ ¡Felicidades! Se han sumado 5 consultas a tu cuenta.");
+
+                if(data.res) {
                     const contador = document.getElementById('contador-consultas');
                     if(contador) contador.innerText = data.restantes;
-                    resDiv.innerText = "Consultas actualizadas correctamente.";
+                    resDiv.innerText = "✅ ¡5 consultas agregadas correctamente!";
                 } else {
-                    alert("Error: " + data.error);
+                    resDiv.innerText = "❌ " + (data.error || "Error al registrar anuncio.");
                 }
-            } catch (err) {
-                alert("Error al conectar con el servidor de anuncios.");
+            } catch(err) {
+                resDiv.innerText = "⚠️ Error al conectar con el servidor.";
             }
         }
 
