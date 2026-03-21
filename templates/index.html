@@ -3,54 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mentor IA - Beta 2.1</title>
+    <title>Mentor IA - Beta 2.1 (V.A.L.F.)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: #f4f7f6; padding: 20px; }
         .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #2c3e50; }
+        
+        /* Estilos del Logo */
+        .logo-container { text-align: center; margin-bottom: 10px; }
+        .logo-mentor { max-width: 120px; height: auto; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border: 3px solid #f4f7f6; }
+
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 5px; margin-top: 10px; }
+        .subtitle { text-align: center; color: #7f8c8d; font-size: 0.9em; margin-bottom: 20px; }
         .nav-links { text-align: right; margin-bottom: 10px; }
         .btn-login { padding: 8px 16px; background: #4285f4; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; }
         .btn-logout { padding: 8px 16px; background: #ea4335; color: white; text-decoration: none; border-radius: 6px; }
-        textarea { width: 100%; height: 180px; padding: 12px; border: 2px solid #ddd; border-radius: 10px; box-sizing: border-box; }
+        .btn-tienda { padding: 8px 16px; background: #f1c40f; color: #2c3e50; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 5px; }
+        
+        /* Selectores de materia */
+        .materia-selector { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; justify-content: center; }
+        select { padding: 8px; border-radius: 8px; border: 2px solid #3498db; outline: none; }
+
+        textarea { width: 100%; height: 180px; padding: 12px; border: 2px solid #ddd; border-radius: 10px; box-sizing: border-box; font-size: 16px; }
+        
         .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 15px; }
-        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; background: #2c3e50; color: white; font-weight: 600; }
-        button:hover { background: #34495e; }
+        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; background: #2c3e50; color: white; font-weight: 600; transition: 0.3s; }
+        button:hover { background: #34495e; transform: translateY(-2px); }
         .btn-load { background: #27ae60; grid-column: 1 / -1; }
-        #resultado { margin-top: 20px; padding: 20px; background: #f9f9f9; border-radius: 10px; border-left: 5px solid #2c3e50; white-space: pre-wrap; }
+        .btn-oratoria { background: #8e44ad; }
+
+        /* Formulario de Exámenes */
+        .exam-form { margin-top: 30px; padding: 15px; border: 1px dashed #bdc3c7; border-radius: 10px; background: #fdfefe; }
+        .exam-form h3 { margin-top: 0; color: #2c3e50; font-size: 1.1em; }
+        .exam-inputs { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; }
+        .exam-inputs input { padding: 8px; border: 1px solid #ddd; border-radius: 5px; }
+
+        #resultado { margin-top: 20px; padding: 20px; background: #f9f9f9; border-radius: 10px; border-left: 5px solid #2c3e50; white-space: pre-wrap; line-height: 1.5; }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="logo-container">
+            <img src="https://lh3.googleusercontent.com/d/1KljzH443DnPqM5P1TDXjfXsrac4D-5Hz" alt="Logo Mentor IA" class="logo-mentor">
+        </div>
+
         <h1>Mentor IA Académico</h1>
+        <div class="subtitle">Entrenador especializado - Proyecto V.A.L.F.</div>
+        
         <div class="nav-links">
+            <a href="#" class="btn-tienda" onclick="verTienda()">🛒 Tienda</a>
             <a href="/login" class="btn-login">🔑 Login</a>
             <a href="/logout" class="btn-logout">🚪 Salir</a>
+        </div>
+
+        <div class="materia-selector">
+            <label for="materia">📚 <b>Elegir Materia:</b></label>
+            <select id="materia">
+                <option value="general">General / Otras</option>
+                <option value="higiene">Higiene y Seguridad (Méndez)</option>
+                <option value="matematica">Matemática (Cálculo/Kenko)</option>
+                <option value="politica">Política y Sociedad (Oratoria)</option>
+            </select>
         </div>
         
         <textarea id="texto" placeholder="Pega aquí tu material o tu pregunta..."></textarea>
         
         <div class="controls">
-            <button class="btn-load" onclick="enviar('cargar_material')">📌 Guardar Material</button>
+            <button class="btn-load" onclick="enviar('cargar_material')">📌 Guardar Material de Contexto</button>
             <button onclick="enviar('resumir')">Resumir</button>
             <button onclick="enviar('explicar')">Explicar</button>
             <button onclick="enviar('evaluar')">Evaluar</button>
+            <button class="btn-oratoria" onclick="enviar('preparar_oratoria')">🎙️ Preparar Oratoria</button>
         </div>
 
         <div id="resultado">El resultado aparecerá aquí...</div>
+
+        <div class="exam-form">
+            <h3>📅 Programar Alerta de Examen</h3>
+            <div class="exam-inputs">
+                <input type="text" id="exam-materia" placeholder="Materia">
+                <input type="date" id="exam-fecha">
+                <button onclick="programarExamen()">🔔 Avisarme al Mail</button>
+            </div>
+        </div>
     </div>
 
     <script>
         async function enviar(tarea) {
             const texto = document.getElementById('texto').value;
+            const materia = document.getElementById('materia').value;
             const resDiv = document.getElementById('resultado');
             
-            // Validación: Solo permitimos enviar si hay texto (o si es cargar material)
             if (tarea !== 'cargar_material' && !texto) return alert("Ingresa contenido primero.");
-            resDiv.innerText = "Pensando...";
+            resDiv.innerText = "Pensando como experto...";
 
             try {
-                // Sincronizado con app.py: enviamos solo el texto o el material
-                const payload = tarea === 'cargar_material' ? { material: texto } : { texto: texto };
+                const payload = { 
+                    texto: texto, 
+                    material: tarea === 'cargar_material' ? texto : undefined,
+                    materia: materia 
+                };
                 
                 const response = await fetch(`/${tarea}`, {
                     method: 'POST',
@@ -59,10 +110,38 @@
                 });
                 const data = await response.json();
                 
-                // Mostramos el resultado dependiendo de la clave devuelta por el servidor
                 resDiv.innerText = data.resultado || data.res || data.error || "Operación completada.";
             } catch (err) {
-                resDiv.innerText = "⚠️ Error de conexión.";
+                resDiv.innerText = "⚠️ Error de conexión con el servidor.";
+            }
+        }
+
+        async function programarExamen() {
+            const materia = document.getElementById('exam-materia').value;
+            const fecha = document.getElementById('exam-fecha').value;
+            
+            if (!materia || !fecha) return alert("Completa materia y fecha.");
+
+            try {
+                const response = await fetch('/configurar_examen', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ materia, fecha })
+                });
+                const data = await response.json();
+                alert(data.res || data.error);
+            } catch (err) {
+                alert("Error al programar alerta.");
+            }
+        }
+
+        async function verTienda() {
+            try {
+                const response = await fetch('/tienda');
+                const data = await response.json();
+                alert(`🏪 TIENDA MENTOR\n\n${data.mensaje}\n\nOpciones próximas:\n- ${data.opciones.join('\n- ')}`);
+            } catch (err) {
+                alert("La tienda no está disponible en este momento.");
             }
         }
     </script>
