@@ -1,8 +1,8 @@
 import os
 import logging
 import datetime
-# NUEVO IMPORT: Librería oficial actualizada
-from google import genai
+# NUEVO IMPORT: Librería de Groq (reemplaza a google.genai)
+from groq import Groq
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template, flash
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -50,7 +50,7 @@ mail = Mail(app)
 db = SQLAlchemy(app)
 
 # ---------------------------------------------------------------------------
-# Google OAuth
+# Google OAuth (Se mantiene igual para el Login)
 # ---------------------------------------------------------------------------
 oauth = OAuth(app)
 google = oauth.register(
@@ -62,18 +62,16 @@ google = oauth.register(
 )
 
 # ---------------------------------------------------------------------------
-# Gemini (CORRECCIÓN: FORZADO DE VERSIÓN V1)
+# Groq (Motor de IA - Migración desde Gemini)
 # ---------------------------------------------------------------------------
 api_key = os.environ.get("API_KEY")
 if not api_key:
     raise ValueError("Falta la variable de entorno API_KEY")
 
-# Forzamos v1 en http_options para evitar el error 404 de la ruta v1beta
-client = genai.Client(
-    api_key=api_key,
-    http_options={'api_version': 'v1'}
-)
-MODEL_ID = "gemini-1.5-flash"
+# Inicialización del cliente de Groq
+client = Groq(api_key=api_key)
+# Usaremos Llama 3.3 70B por su gran capacidad de razonamiento académico
+MODEL_ID = "llama-3.3-70b-versatile"
 
 # ---------------------------------------------------------------------------
 # Constantes
@@ -175,32 +173,37 @@ def info_usuario():
     })
 
 # ---------------------------------------------------------------------------
-# IA Logic (CORREGIDO PARA FORZAR V1)
+# IA Logic (MIGRADO A GROQ)
 # ---------------------------------------------------------------------------
 def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, materia: str = "general"):
     perfil_materia = PERFILES_MATERIA.get(materia, "")
 
-    prompt = (
-        f"Eres el Mentor Académico. {perfil_materia}\n"
-        f"Historial del alumno: {usuario.perfil_aprendizaje}\n"
-        f"Contexto/Material: {material}\n"
-        f"Acción: {tarea}\n"
-        f"Entrada del Estudiante: {texto}"
-    )
-
     try:
-        resp = client.models.generate_content(
+        # Groq utiliza el formato de Chat Completion
+        completion = client.chat.completions.create(
             model=MODEL_ID,
-            contents=prompt
+            messages=[
+                {
+                    "role": "system", 
+                    "content": f"Eres el Mentor Académico. {perfil_materia}\nHistorial del alumno: {usuario.perfil_aprendizaje}"
+                },
+                {
+                    "role": "user", 
+                    "content": f"Contexto/Material: {material}\nAcción: {tarea}\nEntrada del Estudiante: {texto}"
+                }
+            ],
+            temperature=0.7,
+            max_tokens=2048
         )
-        if resp.text:
-            res = resp.text
+        
+        res = completion.choices[0].message.content
+        if res:
             nueva_entrada = f"Q: {texto[:50]}... A: {res[:50]}..."
             usuario.perfil_aprendizaje = (nueva_entrada + usuario.perfil_aprendizaje)[:PERFIL_MAX]
             return res
         return None
     except Exception as e:
-        logger.error("Error Gemini con nueva SDK: %s", repr(e))
+        logger.error("Error en Groq: %s", repr(e))
         return None
 
 @app.route("/<tarea>", methods=["POST"])
@@ -287,3 +290,4 @@ def ver_anuncio():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    
