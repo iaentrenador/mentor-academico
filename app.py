@@ -67,10 +67,13 @@ google = oauth.register(
 api_key = os.environ.get("API_KEY")
 if not api_key:
     raise ValueError("Falta la variable de entorno API_KEY")
+
+# FORZAR API V1: Solución para el error NotFound en v1beta visto en logs
+os.environ["GOOGLE_API_VERSION"] = "v1"
 genai.configure(api_key=api_key)
 
-# LÍNEA CORREGIDA: Nombre de recurso completo para forzar la detección en v1beta/v1
-model = genai.GenerativeModel("models/gemini-1.5-flash")
+# LÍNEA CORREGIDA: Nombre estándar para máxima compatibilidad con v1 estable
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ---------------------------------------------------------------------------
 # Constantes
@@ -281,3 +284,4 @@ def ver_anuncio():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    
