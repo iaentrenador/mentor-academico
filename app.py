@@ -62,14 +62,17 @@ google = oauth.register(
 )
 
 # ---------------------------------------------------------------------------
-# Gemini (ACTUALIZADO A LA NUEVA SDK)
+# Gemini (ACTUALIZADO CON FORZADO DE VERSIÓN V1)
 # ---------------------------------------------------------------------------
 api_key = os.environ.get("API_KEY")
 if not api_key:
     raise ValueError("Falta la variable de entorno API_KEY")
 
-# Inicialización del cliente nuevo
-client = genai.Client(api_key=api_key)
+# Inicialización del cliente forzando la API estable 'v1' para evitar el 404 de la v1beta
+client = genai.Client(
+    api_key=api_key,
+    http_options={'api_version': 'v1'}
+)
 MODEL_ID = "gemini-1.5-flash"
 
 # ---------------------------------------------------------------------------
