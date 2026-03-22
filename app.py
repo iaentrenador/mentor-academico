@@ -1,7 +1,8 @@
 import os
 import logging
 import datetime
-import google.generativeai as genai
+# NUEVO IMPORT: Librería oficial actualizada
+from google import genai
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template, flash
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -61,19 +62,15 @@ google = oauth.register(
 )
 
 # ---------------------------------------------------------------------------
-# Gemini
+# Gemini (ACTUALIZADO A LA NUEVA SDK)
 # ---------------------------------------------------------------------------
-# FIX: API key obligatoria desde entorno, falla claro si no está definida
 api_key = os.environ.get("API_KEY")
 if not api_key:
     raise ValueError("Falta la variable de entorno API_KEY")
 
-# FORZAR API V1: Solución para el error NotFound en v1beta visto en logs
-os.environ["GOOGLE_API_VERSION"] = "v1"
-genai.configure(api_key=api_key)
-
-# LÍNEA CORREGIDA: Nombre estándar para máxima compatibilidad con v1 estable
-model = genai.GenerativeModel("gemini-1.5-flash")
+# Inicialización del cliente nuevo
+client = genai.Client(api_key=api_key)
+MODEL_ID = "gemini-1.5-flash"
 
 # ---------------------------------------------------------------------------
 # Constantes
@@ -175,7 +172,7 @@ def info_usuario():
     })
 
 # ---------------------------------------------------------------------------
-# IA Logic (CON PROTECCIÓN DE CONSULTAS)
+# IA Logic (ACTUALIZADO PARA EL NUEVO CLIENTE)
 # ---------------------------------------------------------------------------
 def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, materia: str = "general"):
     perfil_materia = PERFILES_MATERIA.get(materia, "")
@@ -189,15 +186,19 @@ def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, m
     )
 
     try:
-        resp = model.generate_content(prompt)
-        if hasattr(resp, "text"):
+        # Uso del nuevo método de generación de contenido
+        resp = client.models.generate_content(
+            model=MODEL_ID,
+            contents=prompt
+        )
+        if resp.text:
             res = resp.text
             nueva_entrada = f"Q: {texto[:50]}... A: {res[:50]}..."
             usuario.perfil_aprendizaje = (nueva_entrada + usuario.perfil_aprendizaje)[:PERFIL_MAX]
             return res
         return None
     except Exception as e:
-        logger.error("Error Gemini completo: %s", repr(e))
+        logger.error("Error Gemini con nueva SDK: %s", repr(e))
         return None
 
 @app.route("/<tarea>", methods=["POST"])
@@ -284,4 +285,3 @@ def ver_anuncio():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-    
