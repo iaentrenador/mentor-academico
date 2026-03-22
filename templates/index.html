@@ -43,7 +43,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- FIX: Logo restaurado a la URL original -->
         <div class="logo-container">
             <img src="https://lh3.googleusercontent.com/u/0/d/1KljzH443DnPqM5P1TDXjfXsrac4D-5Hz=w1000" alt="Logo Mentor IA" class="logo-mentor">
         </div>
@@ -55,7 +54,7 @@
             <a href="#" class="btn-nav btn-tienda" onclick="verTienda()">🛒 Tienda</a>
             {% if usuario %}
                 <div class="status-badge">⚡ Consultas: <span id="contador-consultas">...</span></div>
-                <button class="btn-nav" style="background: #27ae60; color: white;" onclick="verPublicidad()">📺 +5 Consultas</button>
+                <button id="btn-ad" class="btn-nav" style="background: #27ae60; color: white;" onclick="verPublicidad()">📺 +5 Consultas</button>
                 <a href="/logout" class="btn-nav btn-logout">🚪 Salir</a>
             {% else %}
                 <a href="/login" class="btn-nav btn-login">🔑 Entrar</a>
@@ -103,7 +102,6 @@
     </div>
 
     <script>
-        // FIX: window.onload con try/catch para evitar error silencioso
         window.onload = async () => {
             try {
                 const res = await fetch('/api/usuario');
@@ -113,11 +111,10 @@
                     if (contador) contador.innerText = data.restantes;
                 }
             } catch (err) {
-                console.log("Sesión no iniciada o error de API.");
+                console.log("Sesión no iniciada.");
             }
         };
 
-        // Muestra el campo de consigna la primera vez, luego envía
         function toggleEvaluar() {
             const cont = document.getElementById('consigna-container');
             if (cont.style.display === 'block') {
@@ -135,14 +132,12 @@
             const resDiv = document.getElementById('resultado');
             const contador = document.getElementById('contador-consultas');
 
-            // Validaciones
             if (tarea === 'cargar_material' && !texto) return alert("Pegá el material antes de guardarlo.");
             if (tarea !== 'cargar_material' && !texto) return alert("Ingresa contenido primero.");
 
             resDiv.innerHTML = "<i>Pensando como experto...</i>";
 
             try {
-                // FIX: payload separado por tarea — cargar_material solo manda "material"
                 const payload = tarea === 'cargar_material'
                     ? { material: texto }
                     : { texto: texto, writing: texto, prompt: consigna, materia: materia };
@@ -161,44 +156,58 @@
 
                     const resIA = data.resultado || data.res;
 
-                    // Renderizado inteligente: JSON (evaluar) vs texto plano
-                    if (typeof resIA === 'object' && resIA !== null) {
+                    if (tarea === 'cargar_material') {
+                        document.getElementById('consigna-container').style.display = 'block';
+                        document.getElementById('texto').value = "";
+                        document.getElementById('texto').placeholder = "Ahora escribe tu RESPUESTA para que el Mentor la evalúe...";
+                        resDiv.innerHTML = "✅ <b>Material guardado.</b><br>Se habilitaron los campos de <b>Consigna</b> y <b>Respuesta</b>. Completalos y pulsa 'Evaluar'.";
+                        document.getElementById('consigna').focus();
+                    } else if (typeof resIA === 'object' && resIA !== null) {
                         resDiv.innerHTML = `
                             <div class="nota-box">${resIA.nota || 'S/N'}</div>
-                            <div class="seccion-eval"><b>✅ Fortalezas:</b> ${resIA.fortalezas || resIA.puntos_positivos || ''}</div>
-                            <div class="seccion-eval"><b>⚠️ Debilidades:</b> ${resIA.debilidades || resIA.puntos_negativos || ''}</div>
-                            <div class="seccion-eval"><b>💡 Sugerencia:</b> ${resIA.sugerencia || resIA.feedback || ''}</div>
+                            <div class="seccion-eval"><b>✅ Fortalezas:</b> ${resIA.fortalezas || ''}</div>
+                            <div class="seccion-eval"><b>⚠️ Debilidades:</b> ${resIA.debilidades || ''}</div>
+                            <div class="seccion-eval"><b>💡 Sugerencia:</b> ${resIA.sugerencia || ''}</div>
                         `;
                     } else {
                         resDiv.innerText = resIA || "Operación completada.";
                     }
                 }
             } catch (err) {
-                resDiv.innerText = "⚠️ Error de conexión con el servidor. Verifica tu señal o el estado de la app.";
+                resDiv.innerText = "⚠️ Error de conexión con el servidor.";
             }
         }
 
-        // Abre el anuncio y arranca el temporizador de 15 segundos
         async function verPublicidad() {
+            const btnAd = document.getElementById('btn-ad');
+            const resDiv = document.getElementById('resultado');
+
             if (!confirm("¿Deseas ver un anuncio para obtener 5 consultas extra?")) return;
 
             window.open('https://www.profitablecpmratenetwork.com/n2r78m21y?key=53d8cbd50aefa22ac6dd367853c1809e', '_blank');
 
+            // FIX: el botón se bloquea y se rehabilita solo al terminar registrarAnuncio
+            btnAd.disabled = true;
+            btnAd.style.opacity = "0.5";
             let segundos = 15;
-            document.getElementById('resultado').innerHTML = `⏳ Viendo anuncio... Aguardá <b><span id="timer">${segundos}</span> segundos</b> para recibir tus consultas.`;
+
+            resDiv.innerHTML = `⏳ Validando visualización... Aguardá <b><span id="timer">${segundos}</span> segundos</b> para recibir tus consultas. No cierres la app.`;
 
             const intervalo = setInterval(() => {
                 segundos--;
                 const timerEl = document.getElementById('timer');
                 if (timerEl) timerEl.innerText = segundos;
-                if (segundos <= 0) { clearInterval(intervalo); registrarAnuncio(); }
+                if (segundos <= 0) {
+                    clearInterval(intervalo);
+                    registrarAnuncio(); // el botón se rehabilita dentro de registrarAnuncio
+                }
             }, 1000);
         }
 
-        // FIX: registrarAnuncio con try/catch completo
         async function registrarAnuncio() {
             const resDiv = document.getElementById('resultado');
-            resDiv.innerText = "Verificando anuncio...";
+            const btnAd = document.getElementById('btn-ad');
+            resDiv.innerText = "Registrando tus beneficios...";
             try {
                 const response = await fetch('/ver_anuncio', {
                     method: 'POST',
@@ -210,10 +219,14 @@
                     if (contador) contador.innerText = data.restantes;
                     resDiv.innerText = "✅ ¡5 consultas agregadas correctamente!";
                 } else {
-                    resDiv.innerText = "❌ " + (data.error || "Error al registrar anuncio.");
+                    resDiv.innerText = "❌ " + (data.error || "Error al registrar.");
                 }
             } catch (err) {
                 resDiv.innerText = "⚠️ Error al conectar con el servidor.";
+            } finally {
+                // FIX: el botón se rehabilita siempre al terminar, sea éxito o error
+                btnAd.disabled = false;
+                btnAd.style.opacity = "1";
             }
         }
 
@@ -238,11 +251,12 @@
             try {
                 const response = await fetch('/tienda');
                 const data = await response.json();
+                // FIX: restauradas las opciones en el alert
                 alert(`🏪 TIENDA MENTOR\n\n${data.mensaje}\n\nOpciones próximas:\n- ${data.opciones.join('\n- ')}`);
             } catch (err) {
-                alert("La tienda no está disponible en este momento.");
+                alert("La tienda no está disponible.");
             }
         }
     </script>
 </body>
-</html>
+    </html>
