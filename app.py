@@ -62,14 +62,17 @@ google = oauth.register(
 )
 
 # ---------------------------------------------------------------------------
-# Gemini (CONFIGURACIÓN AUTOMÁTICA RECOMENDADA)
+# Gemini (CORRECCIÓN: FORZADO DE VERSIÓN V1)
 # ---------------------------------------------------------------------------
 api_key = os.environ.get("API_KEY")
 if not api_key:
     raise ValueError("Falta la variable de entorno API_KEY")
 
-# Inicialización estándar: la librería google-genai elige la mejor ruta estable
-client = genai.Client(api_key=api_key)
+# Forzamos v1 en http_options para evitar el error 404 de la ruta v1beta
+client = genai.Client(
+    api_key=api_key,
+    http_options={'api_version': 'v1'}
+)
 MODEL_ID = "gemini-1.5-flash"
 
 # ---------------------------------------------------------------------------
@@ -172,7 +175,7 @@ def info_usuario():
     })
 
 # ---------------------------------------------------------------------------
-# IA Logic (ESTABLE CON NUEVA SDK)
+# IA Logic (CORREGIDO PARA FORZAR V1)
 # ---------------------------------------------------------------------------
 def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, materia: str = "general"):
     perfil_materia = PERFILES_MATERIA.get(materia, "")
@@ -186,7 +189,6 @@ def ejecutar_tarea_ia(tarea: str, texto: str, material: str, usuario: Usuario, m
     )
 
     try:
-        # La librería autocompleta la ruta del modelo correctamente
         resp = client.models.generate_content(
             model=MODEL_ID,
             contents=prompt
