@@ -46,7 +46,6 @@ google = oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-# FIX: Validación obligatoria de API_KEY antes de inicializar el cliente
 api_key = os.environ.get("API_KEY")
 if not api_key:
     raise ValueError("Falta la variable de entorno API_KEY")
@@ -98,14 +97,14 @@ def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consig
 
     prompt_sistema = f"""{perfil_materia}
 Eres el 'Mentor IA'. Tu objetivo es el entrenamiento cognitivo.
-REGLAS: 1. Usa andamiaje (pistas, no soluciones). 2. Si la tarea es 'evaluar', responde SOLO en JSON.
+REGLAS: 1. Usa andamiaje (pistas, no soluciones). 2. Si la tarea es 'evaluar', responde SOLO en JSON con campos: nota, fortalezas, debilidades, sugerencia.
 HISTORIAL: {usuario.perfil_aprendizaje}"""
 
     if tarea == "evaluar":
-        content = f"CONSIGNA: {consigna}\nMATERIAL: {material}\nRESPUESTA ALUMNO: {texto}\nAnaliza rigurosamente."
+        content = f"CONSIGNA DOCENTE: {consigna}\nMATERIAL DE ESTUDIO: {material}\nRESPUESTA DEL ALUMNO: {texto}\nAnaliza si el alumno comprendió el material basándose en la consigna."
         response_format = {"type": "json_object"}
     else:
-        content = f"CONTEXTO: {material}\nACCIÓN: {tarea}\nENTRADA: {texto}"
+        content = f"CONTEXTO/MATERIAL: {material}\nACCIÓN: {tarea}\nENTRADA: {texto}"
         response_format = {"type": "text"}
 
     try:
@@ -176,41 +175,42 @@ def manejar_tarea(tarea):
     if not u:
         return jsonify({"error": "No autenticado"}), 401
 
-    # FIX: Validación de longitud restaurada en cargar_material
-    if tarea == "cargar_material":
-        material = request.json.get("material", "")
-        if len(material) > MAX_MATERIAL:
+    data = request.get_json(silent=True) or {}
+
+    # Si viene material en el request, lo actualizamos antes de cualquier tarea
+    nuevo_material = data.get("material")
+    if nuevo_material:
+        if len(nuevo_material) > MAX_MATERIAL:
             return jsonify({"error": "Material muy largo"}), 400
-        u.material = material
+        u.material = nuevo_material
         db.session.commit()
-        return jsonify({"res": "Material cargado"})
+        if tarea == "cargar_material":
+            return jsonify({"res": "Material guardado correctamente."})
 
     resetear_si_nuevo_dia(u)
     permitidas = consultas_permitidas(u)
     if u.consultas_usadas >= permitidas:
         return jsonify({"error": "Consultas agotadas por hoy."}), 403
 
-    data = request.get_json(silent=True) or {}
     texto = data.get("writing", data.get("texto", "")).strip()
     materia = data.get("materia", "general")
     consigna = data.get("prompt", "")
 
     if not texto:
-        return jsonify({"error": "Texto obligatorio"}), 400
+        return jsonify({"error": "Falta el contenido para procesar."}), 400
     if len(texto) > MAX_TEXTO:
         return jsonify({"error": "Texto muy largo"}), 400
 
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia, consigna)
 
     if res is None:
-        return jsonify({"error": "Error de conexión con la IA. No se descontó tu consulta. Intenta de nuevo."}), 503
+        return jsonify({"error": "Error de conexión con la IA. No se descontó consulta."}), 503
 
-    # FIX: json.loads protegido con try/except para evitar crash si Groq devuelve JSON malformado
     if tarea == "evaluar":
         try:
             resultado = json.loads(res)
         except json.JSONDecodeError:
-            logger.error("Groq devolvió JSON malformado en evaluar: %s", res)
+            logger.error("JSON malformado: %s", res)
             resultado = {"raw": res}
     else:
         resultado = res
@@ -257,7 +257,8 @@ def ver_anuncio():
     if not u:
         return jsonify({"error": "No autenticado"}), 401
     if u.bloques_publicidad_vistos >= MAX_BLOQUES_PUBLICIDAD:
-        return jsonify({"error": "Ya obtuviste el máximo de consultas extra por hoy. Volvé mañana."}), 403
+        return jsonify({"error": "Máximo de anuncios diarios alcanzado."}), 403
+    # FIX: salto de línea eliminado
     u.bloques_publicidad_vistos += 1
     db.session.commit()
     return jsonify({"res": "Anuncio registrado", "restantes": consultas_permitidas(u) - u.consultas_usadas})
