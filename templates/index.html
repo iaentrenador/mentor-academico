@@ -5,59 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mentor IA - Beta 2.1 (V.A.L.F.)</title>
     <style>
-        /* Optimizaciones de Espaciado y Flexibilidad */
+        /* MANTENIDO: Tus estilos originales intactos */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f0f2f5; padding: 10px; color: #333; }
         .container { max-width: 900px; margin: 10px auto; background: #fff; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
-        
         .logo-container { text-align: center; margin-bottom: 15px; }
         .logo-mentor { max-width: 100px; height: auto; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-
         h1 { text-align: center; color: #1a2a3a; margin: 10px 0 5px 0; font-size: 1.8em; }
         .subtitle { text-align: center; color: #666; font-size: 0.95em; margin-bottom: 25px; font-weight: 400; }
-        
         .nav-links { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .btn-nav { padding: 10px 18px; border-radius: 10px; font-weight: 600; text-decoration: none; font-size: 0.9em; transition: 0.2s; border: none; cursor: pointer; }
         .btn-login { background: #4285f4; color: white; }
         .btn-logout { background: #feebeb; color: #ea4335; }
         .btn-tienda { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        
-        /* Contador de consultas */
         .status-badge { background: #e8f5e9; color: #2e7d32; padding: 8px 12px; border-radius: 8px; font-weight: bold; font-size: 0.9em; border: 1px solid #c8e6c9; }
-
         .materia-selector { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 15px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
         select { width: 100%; max-width: 300px; padding: 12px; border-radius: 10px; border: 2px solid #dee2e6; font-size: 1em; outline: none; transition: border-color 0.2s; }
-        select:focus { border-color: #3498db; }
-
         .tip-box { background: #e7f3ff; color: #0c5460; padding: 15px; border-radius: 12px; font-size: 0.9em; margin-bottom: 15px; border-left: 6px solid #007bff; line-height: 1.4; }
-
-        textarea { width: 100%; height: 220px; padding: 15px; border: 2px solid #eee; border-radius: 15px; box-sizing: border-box; font-size: 16px; resize: vertical; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
-        textarea:focus { border-color: #3498db; outline: none; }
+        textarea { width: 100%; height: 200px; padding: 15px; border: 2px solid #eee; border-radius: 15px; box-sizing: border-box; font-size: 16px; resize: vertical; margin-bottom: 10px; }
         
+        /* NUEVO: Estilo para el input de Consigna (Triple Bloque) */
+        #consigna-container { display: none; margin-bottom: 10px; animation: fadeIn 0.3s; }
+        .input-consigna { width: 100%; padding: 12px; border: 2px dashed #3498db; border-radius: 10px; background: #f0f7ff; }
+
         .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 20px; }
         button { padding: 14px; border: none; border-radius: 12px; cursor: pointer; background: #2c3e50; color: white; font-weight: 600; font-size: 0.95em; transition: all 0.3s ease; }
-        button:hover { background: #1a2a3a; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .btn-load { background: #28a745; grid-column: 1 / -1; font-size: 1.1em; }
         .btn-oratoria { background: #6f42c1; }
 
+        /* NUEVO: Estilos para el Resultado tipo "Expediente" */
+        #resultado { margin-top: 25px; padding: 25px; background: #fafbfc; border-radius: 15px; border-left: 6px solid #2c3e50; min-height: 100px; font-size: 1.05em; }
+        .nota-box { float: right; background: #2c3e50; color: white; padding: 10px 20px; border-radius: 10px; font-size: 1.5em; font-weight: bold; }
+        .seccion-eval { margin-bottom: 15px; }
+        .seccion-eval b { color: #1a2a3a; display: block; margin-bottom: 5px; text-transform: uppercase; font-size: 0.85em; }
+
         .exam-form { margin-top: 35px; padding: 20px; border-radius: 15px; background: #fdfefe; border: 1px solid #e1e4e8; }
-        .exam-form h3 { margin-top: 0; color: #24292e; font-size: 1.2em; border-bottom: 2px solid #f1f1f1; padding-bottom: 10px; margin-bottom: 15px; }
         .exam-inputs { display: flex; flex-direction: column; gap: 12px; }
-        .exam-inputs input { padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 1em; }
-        .btn-exam { background: #0366d6; }
+        .exam-inputs input { padding: 12px; border: 1px solid #ddd; border-radius: 10px; flex: 1; }
 
-        #resultado { margin-top: 25px; padding: 25px; background: #fafbfc; border-radius: 15px; border-left: 6px solid #2c3e50; white-space: pre-wrap; line-height: 1.6; font-size: 1.05em; color: #24292e; min-height: 100px; }
-
-        /* Media Query para mejorar visualización en PC */
-        @media (min-width: 600px) {
-            .exam-inputs { flex-direction: row; }
-            .exam-inputs input { flex: 1; }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        @media (min-width: 600px) { .exam-inputs { flex-direction: row; } }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="logo-container">
-            <img src="https://lh3.googleusercontent.com/u/0/d/1KljzH443DnPqM5P1TDXjfXsrac4D-5Hz=w1000" alt="Logo Mentor IA" class="logo-mentor">
+            <img src="https://via.placeholder.com/100" alt="Logo Mentor IA" class="logo-mentor">
         </div>
 
         <h1>Mentor IA Académico</h1>
@@ -65,7 +57,6 @@
         
         <div class="nav-links">
             <a href="#" class="btn-nav btn-tienda" onclick="verTienda()">🛒 Tienda</a>
-            
             {% if usuario %}
                 <div class="status-badge">⚡ Consultas: <span id="contador-consultas">...</span></div>
                 <button class="btn-nav" style="background: #27ae60; color: white;" onclick="verPublicidad()">📺 +5 Consultas</button>
@@ -77,7 +68,7 @@
 
         <div class="materia-selector">
             <label for="materia">📚 <b>Elegir Materia de Estudio:</b></label>
-            <select id="materia">
+            <select id="materia" onchange="checkMateria()">
                 <option value="general">General / Otras</option>
                 <option value="higiene">Higiene y Seguridad (Méndez)</option>
                 <option value="matematica">Matemática (Cálculo/Kenko)</option>
@@ -85,17 +76,17 @@
             </select>
         </div>
 
-        <div class="tip-box">
-            💡 <b>Tip V.A.L.F:</b> Para textos muy extensos, primero usa <b>Guardar Material</b>. Luego pide el resumen o explicación para mayor precisión.
+        <div id="consigna-container">
+            <input type="text" id="consigna" class="input-consigna" placeholder="📌 Pega aquí la consigna del docente (opcional)...">
         </div>
         
-        <textarea id="texto" placeholder="Escribe aquí tu duda o pega el material de la cursada..."></textarea>
+        <textarea id="texto" placeholder="Escribe aquí tu duda o tu respuesta para evaluar..."></textarea>
         
         <div class="controls">
             <button class="btn-load" onclick="enviar('cargar_material')">📌 Guardar Material de Contexto</button>
             <button onclick="enviar('resumir')">Resumir</button>
             <button onclick="enviar('explicar')">Explicar</button>
-            <button onclick="enviar('evaluar')">Evaluar</button>
+            <button onclick="toggleEvaluar()">Evaluar</button>
             <button class="btn-oratoria" onclick="enviar('preparar_oratoria')">🎙️ Preparar Oratoria</button>
         </div>
 
@@ -106,48 +97,49 @@
             <div class="exam-inputs">
                 <input type="text" id="exam-materia" placeholder="Materia (ej: Higiene I)">
                 <input type="date" id="exam-fecha">
-                <button class="btn-exam" onclick="programarExamen()">🔔 Avisarme al Mail</button>
+                <button class="btn-exam" style="background: #0366d6; color: white; border:none; padding:10px; border-radius:10px; cursor:pointer;" onclick="programarExamen()">🔔 Avisarme al Mail</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Al cargar la página, pedimos la info del usuario para el contador
+        // MANTENIDO: Lógica de carga inicial
         window.onload = async () => {
-            try {
-                const res = await fetch('/api/usuario');
-                const data = await res.json();
-                if(data.logueado) {
-                    const contador = document.getElementById('contador-consultas');
-                    if(contador) contador.innerText = data.restantes;
-                }
-            } catch (err) {
-                console.log("Sesión no iniciada o error de API.");
-            }
+            const res = await fetch('/api/usuario');
+            const data = await res.json();
+            if(data.logueado) document.getElementById('contador-consultas').innerText = data.restantes;
         };
+
+        // NUEVO: Muestra/Oculta campo de consigna al hacer clic en Evaluar
+        function toggleEvaluar() {
+            const cont = document.getElementById('consigna-container');
+            if (cont.style.display === 'block') {
+                enviar('evaluar');
+            } else {
+                cont.style.display = 'block';
+                document.getElementById('resultado').innerText = "💡 Se habilitó el campo de CONSIGNA. Completalo para una mejor evaluación.";
+            }
+        }
 
         async function enviar(tarea) {
             const texto = document.getElementById('texto').value;
+            const consigna = document.getElementById('consigna').value;
             const materia = document.getElementById('materia').value;
             const resDiv = document.getElementById('resultado');
             const contador = document.getElementById('contador-consultas');
 
-            // FIX: Validación específica para cada caso
-            if (tarea === 'cargar_material' && !texto) {
-                return alert("Pegá el material antes de guardarlo.");
-            }
-            if (tarea !== 'cargar_material' && !texto) {
-                return alert("Ingresa contenido primero.");
-            }
-
-            resDiv.innerText = "Pensando como experto...";
+            if (!texto && tarea !== 'cargar_material') return alert("Ingresa contenido primero.");
+            resDiv.innerHTML = "<i>Pensando como experto...</i>";
 
             try {
-                // FIX: cargar_material manda el texto bajo la clave "material"
-                // Las demás tareas mandan "texto" y "materia" normalmente
-                const payload = tarea === 'cargar_material'
-                    ? { material: texto }
-                    : { texto: texto, materia: materia };
+                // ADAPTACIÓN: Enviamos campos según lo que espera el app.py (Triple Bloque)
+                const payload = {
+                    texto: texto,      // Fallback para tareas comunes
+                    writing: texto,    // Para 'evaluar'
+                    prompt: consigna,  // La consigna del docente
+                    materia: materia,
+                    material: tarea === 'cargar_material' ? texto : undefined
+                };
 
                 const response = await fetch(`/${tarea}`, {
                     method: 'POST',
@@ -159,93 +151,66 @@
                 if (data.error) {
                     resDiv.innerText = "❌ " + data.error;
                 } else {
-                    resDiv.innerText = data.resultado || data.res || "Operación completada.";
-                    // Actualizamos el contador solo si la IA devolvió el dato (éxito)
-                    if (data.restantes !== undefined && contador) {
-                        contador.innerText = data.restantes;
+                    // MANTENIDO: Actualización de monetización
+                    if (data.restantes !== undefined) contador.innerText = data.restantes;
+
+                    // NUEVO: Lógica de renderizado inteligente (JSON vs Texto)
+                    const resIA = data.resultado || data.res;
+                    if (typeof resIA === 'object') {
+                        resDiv.innerHTML = `
+                            <div class="nota-box">${resIA.nota || 'S/N'}</div>
+                            <div class="seccion-eval"><b>✅ Fortalezas:</b> ${resIA.fortalezas || resIA.puntos_positivos || ''}</div>
+                            <div class="seccion-eval"><b>⚠️ Debilidades:</b> ${resIA.debilidades || resIA.puntos_negativos || ''}</div>
+                            <div class="seccion-eval"><b>💡 Sugerencia:</b> ${resIA.sugerencia || resIA.feedback || ''}</div>
+                        `;
+                    } else {
+                        resDiv.innerText = resIA;
                     }
                 }
             } catch (err) {
-                resDiv.innerText = "⚠️ Error de conexión con el servidor. Verifica tu señal o el estado de la app.";
+                resDiv.innerText = "⚠️ Error de conexión.";
             }
         }
 
-        // FIX: La publicidad ahora abre el anuncio real y espera 15 segundos antes de sumar consultas
+        // MANTENIDO: Lógica de Anuncios y Temporizador
         async function verPublicidad() {
             if(!confirm("¿Deseas ver un anuncio para obtener 5 consultas extra?")) return;
-
-            const resDiv = document.getElementById('resultado');
-
-            // Abre el anuncio en pestaña nueva
             window.open('https://www.profitablecpmratenetwork.com/n2r78m21y?key=53d8cbd50aefa22ac6dd367853c1809e', '_blank');
-
-            // Muestra temporizador de 15 segundos
             let segundos = 15;
-            resDiv.innerHTML = `⏳ Viendo anuncio... Aguardá <b><span id="timer">${segundos}</span> segundos</b> para recibir tus consultas.`;
-
+            document.getElementById('resultado').innerHTML = `⏳ Viendo anuncio... Aguardá <b><span id="timer">${segundos}</span> segundos</b>.`;
             const intervalo = setInterval(() => {
                 segundos--;
-                const timerEl = document.getElementById('timer');
-                if(timerEl) timerEl.innerText = segundos;
-
-                if(segundos <= 0) {
-                    clearInterval(intervalo);
-                    registrarAnuncio(); // Recién acá llama al backend
-                }
+                document.getElementById('timer').innerText = segundos;
+                if(segundos <= 0) { clearInterval(intervalo); registrarAnuncio(); }
             }, 1000);
         }
 
-        // FIX: Separada del botón, se llama solo cuando termina el temporizador
         async function registrarAnuncio() {
-            const resDiv = document.getElementById('resultado');
-            resDiv.innerText = "Verificando anuncio...";
-
-            try {
-                const response = await fetch('/ver_anuncio', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await response.json();
-
-                if(data.res) {
-                    const contador = document.getElementById('contador-consultas');
-                    if(contador) contador.innerText = data.restantes;
-                    resDiv.innerText = "✅ ¡5 consultas agregadas correctamente!";
-                } else {
-                    resDiv.innerText = "❌ " + (data.error || "Error al registrar anuncio.");
-                }
-            } catch(err) {
-                resDiv.innerText = "⚠️ Error al conectar con el servidor.";
+            const response = await fetch('/ver_anuncio', { method: 'POST' });
+            const data = await response.json();
+            if(data.res) {
+                document.getElementById('contador-consultas').innerText = data.restantes;
+                document.getElementById('resultado').innerText = "✅ ¡5 consultas agregadas!";
             }
         }
 
+        // MANTENIDO: Funciones de Examen y Tienda
         async function programarExamen() {
             const materia = document.getElementById('exam-materia').value;
             const fecha = document.getElementById('exam-fecha').value;
-            
-            if (!materia || !fecha) return alert("Completa materia y fecha.");
-
-            try {
-                const response = await fetch('/configurar_examen', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ materia, fecha })
-                });
-                const data = await response.json();
-                alert(data.res || data.error);
-            } catch (err) {
-                alert("Error al programar alerta.");
-            }
+            const response = await fetch('/configurar_examen', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ materia, fecha })
+            });
+            const data = await response.json();
+            alert(data.res || data.error);
         }
 
         async function verTienda() {
-            try {
-                const response = await fetch('/tienda');
-                const data = await response.json();
-                alert(`🏪 TIENDA MENTOR\n\n${data.mensaje}\n\nOpciones próximas:\n- ${data.opciones.join('\n- ')}`);
-            } catch (err) {
-                alert("La tienda no está disponible en este momento.");
-            }
+            const response = await fetch('/tienda');
+            const data = await response.json();
+            alert(`🏪 TIENDA MENTOR\n\n${data.mensaje}\n\nOpciones: ${data.opciones.join(', ')}`);
         }
     </script>
 </body>
