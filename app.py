@@ -69,8 +69,8 @@ if not api_key:
     raise ValueError("Falta la variable de entorno API_KEY")
 genai.configure(api_key=api_key)
 
-# LÍNEA CORREGIDA: Usando el alias estable 'latest' para evitar errores de NotFound
-model = genai.GenerativeModel("gemini-1.5-flash-latest")
+# LÍNEA CORREGIDA: Usando la versión estable compatible con la librería 0.8.3+
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ---------------------------------------------------------------------------
 # Constantes
@@ -230,7 +230,7 @@ def manejar_tarea(tarea: str):
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia)
 
     if res is None:
-        return jsonify({"error": "Error de conexión con la IA. No se descontó tu consulta. Intenta de nuevo."}), 503
+        return jsonify({"error": "Error de conexión con la IA. No se descuenta tu consulta. Intenta de nuevo."}), 503
 
     u.consultas_usadas += 1
     u.ultima_consulta = datetime.datetime.utcnow()
@@ -281,3 +281,4 @@ def ver_anuncio():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    
