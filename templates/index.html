@@ -29,6 +29,8 @@
         .btn-load { background: #28a745; grid-column: 1 / -1; font-size: 1.1em; }
         .btn-oratoria { background: #6f42c1; }
         #resultado { margin-top: 25px; padding: 25px; background: #fafbfc; border-radius: 15px; border-left: 6px solid #2c3e50; min-height: 100px; font-size: 1.05em; line-height: 1.6; }
+        /* Estilo para Modo Abogacía */
+        #resultado.modo-legal { border-left-color: #003366; background: #f0f4f8; }
         .nota-box { float: right; background: #2c3e50; color: white; padding: 10px 20px; border-radius: 10px; font-size: 1.5em; font-weight: bold; }
         .seccion-eval { margin-bottom: 15px; }
         .seccion-eval b { color: #1a2a3a; display: block; margin-bottom: 5px; text-transform: uppercase; font-size: 0.85em; }
@@ -68,6 +70,7 @@
                 <option value="higiene">Higiene y Seguridad (Méndez)</option>
                 <option value="matematica">Matemática (Cálculo/Kenko)</option>
                 <option value="politica">Política y Sociedad (Oratoria)</option>
+                <option value="abogacia">Abogacía (UNLZ / Derecho Argentino)</option>
             </select>
         </div>
 
@@ -135,7 +138,14 @@
             if (tarea === 'cargar_material' && !texto) return alert("Pegá el material antes de guardarlo.");
             if (tarea !== 'cargar_material' && !texto) return alert("Ingresa contenido primero.");
 
-            resDiv.innerHTML = "<i>Pensando como experto...</i>";
+            // Feedback visual según la materia
+            if (materia === 'abogacia') {
+                resDiv.classList.add('modo-legal');
+                resDiv.innerHTML = "<i>⚖️ Analizando marco legal argentino...</i>";
+            } else {
+                resDiv.classList.remove('modo-legal');
+                resDiv.innerHTML = "<i>Pensando como experto...</i>";
+            }
 
             try {
                 const payload = tarea === 'cargar_material'
@@ -186,7 +196,6 @@
 
             window.open('https://www.profitablecpmratenetwork.com/n2r78m21y?key=53d8cbd50aefa22ac6dd367853c1809e', '_blank');
 
-            // FIX: el botón se bloquea y se rehabilita solo al terminar registrarAnuncio
             btnAd.disabled = true;
             btnAd.style.opacity = "0.5";
             let segundos = 15;
@@ -199,7 +208,7 @@
                 if (timerEl) timerEl.innerText = segundos;
                 if (segundos <= 0) {
                     clearInterval(intervalo);
-                    registrarAnuncio(); // el botón se rehabilita dentro de registrarAnuncio
+                    registrarAnuncio();
                 }
             }, 1000);
         }
@@ -224,7 +233,6 @@
             } catch (err) {
                 resDiv.innerText = "⚠️ Error al conectar con el servidor.";
             } finally {
-                // FIX: el botón se rehabilita siempre al terminar, sea éxito o error
                 btnAd.disabled = false;
                 btnAd.style.opacity = "1";
             }
@@ -251,7 +259,6 @@
             try {
                 const response = await fetch('/tienda');
                 const data = await response.json();
-                // FIX: restauradas las opciones en el alert
                 alert(`🏪 TIENDA MENTOR\n\n${data.mensaje}\n\nOpciones próximas:\n- ${data.opciones.join('\n- ')}`);
             } catch (err) {
                 alert("La tienda no está disponible.");
@@ -259,4 +266,5 @@
         }
     </script>
 </body>
-    </html>
+        </html>
+    
