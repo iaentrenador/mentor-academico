@@ -57,10 +57,18 @@ TAREAS_VALIDAS = {"explicar", "resumir", "evaluar", "cargar_material", "preparar
 MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 2_000
 CONSULTAS_BASE, CONSULTAS_POR_AD, MAX_BLOQUES_PUBLICIDAD = 5, 5, 2
 
+# ACTUALIZACIÓN: Se añade el perfil de Abogacía UNLZ
 PERFILES_MATERIA = {
     "higiene": "ROL: Inspector Técnico de Higiene y Seguridad. REGLA: Exige rigor legal (Ley 19587/72 y decretos).",
     "matematica": "ROL: Tutor de Matemática UPE. Explica pasos y teclas de calculadora científica. Usa andamiaje.",
     "politica": "ROL: Mentor de Oratoria y Política. Enfócate en conceptos de Estado, Poder y argumentación.",
+    "abogacia": """ROL: Profesor de la UNLZ (Facultad de Derecho). 
+    REGLAS ESPECÍFICAS: 
+    1. Aplica rigor jurídico máximo basado en la Legislación Argentina y la Constitución Nacional. 
+    2. Exige fundamento legal citando artículos específicos (CN, CCyCN, CP, etc.). 
+    3. Utiliza terminología técnica precisa. 
+    4. Conoce el Plan de Estudios UNLZ (1ero a 6to año) para contextualizar el nivel de la respuesta.
+    5. Si corriges un escrito, evalúa la solidez argumentativa y la jerarquía de las normas."""
 }
 
 # --- MODELO ---
@@ -93,6 +101,7 @@ def consultas_permitidas(u):
 
 # --- IA LOGIC ---
 def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consigna=""):
+    # Selección de perfil incluyendo el nuevo modo
     perfil_materia = PERFILES_MATERIA.get(materia, "ROL: Mentor Académico Universitario.")
 
     prompt_sistema = f"""{perfil_materia}
@@ -101,10 +110,20 @@ REGLAS: 1. Usa andamiaje (pistas, no soluciones). 2. Si la tarea es 'evaluar', r
 HISTORIAL: {usuario.perfil_aprendizaje}"""
 
     if tarea == "evaluar":
-        content = f"CONSIGNA DOCENTE: {consigna}\nMATERIAL DE ESTUDIO: {material}\nRESPUESTA DEL ALUMNO: {texto}\nAnaliza si el alumno comprendió el material basándose en la consigna."
+        # Lógica mejorada para corregir escritos en modo abogacía
+        contexto_eval = "Analiza si el alumno comprendió el material basándose en la consigna."
+        if materia == "abogacia":
+            contexto_eval += " Evalúa especialmente el fundamento legal, el uso de la Constitución Nacional y la precisión técnica jurídica argentina."
+        
+        content = f"CONSIGNA DOCENTE: {consigna}\nMATERIAL DE ESTUDIO: {material}\nRESPUESTA DEL ALUMNO: {texto}\n{contexto_eval}"
         response_format = {"type": "json_object"}
     else:
-        content = f"CONTEXTO/MATERIAL: {material}\nACCIÓN: {tarea}\nENTRADA: {texto}"
+        # Lógica para explicar conceptos en modo abogacía
+        contexto_accion = f"ACCIÓN: {tarea}"
+        if materia == "abogacia" and tarea == "explicar":
+            contexto_accion = "ACCIÓN: Explicar concepto jurídico con profundidad académica de la UNLZ y base constitucional."
+            
+        content = f"CONTEXTO/MATERIAL: {material}\n{contexto_accion}\nENTRADA: {texto}"
         response_format = {"type": "text"}
 
     try:
@@ -121,7 +140,8 @@ HISTORIAL: {usuario.perfil_aprendizaje}"""
         logger.error("Error Groq: %s", repr(e))
         return None
 
-# --- RUTAS DE NAVEGACIÓN Y AUTH ---
+# --- RESTO DEL CÓDIGO (RUTAS Y API) ---
+# Se mantiene igual para no romper la funcionalidad actual
 @app.route("/")
 def index():
     u = get_usuario_actual()
@@ -152,7 +172,6 @@ def logout():
     session.clear()
     return redirect("/")
 
-# --- API: INFO DE USUARIO ---
 @app.route("/api/usuario")
 def info_usuario():
     u = get_usuario_actual()
@@ -166,7 +185,6 @@ def info_usuario():
         "restantes": permitidas - u.consultas_usadas
     })
 
-# --- RUTAS DE TAREAS ---
 @app.route("/<tarea>", methods=["POST"])
 def manejar_tarea(tarea):
     if tarea not in TAREAS_VALIDAS:
@@ -177,7 +195,6 @@ def manejar_tarea(tarea):
 
     data = request.get_json(silent=True) or {}
 
-    # Si viene material en el request, lo actualizamos antes de cualquier tarea
     nuevo_material = data.get("material")
     if nuevo_material:
         if len(nuevo_material) > MAX_MATERIAL:
@@ -193,7 +210,8 @@ def manejar_tarea(tarea):
         return jsonify({"error": "Consultas agotadas por hoy."}), 403
 
     texto = data.get("writing", data.get("texto", "")).strip()
-    materia = data.get("materia", "general")
+    # Aquí es donde el frontend enviará materia: "abogacia" al activar el interruptor
+    materia = data.get("materia", "general") 
     consigna = data.get("prompt", "")
 
     if not texto:
@@ -244,13 +262,11 @@ def configurar_examen():
         logger.error("Error Mail: %s", e)
         return jsonify({"error": "Error al enviar correo"}), 500
 
-# --- RUTA: TIENDA ---
 @app.route("/tienda")
 def tienda():
     mensaje = "Función en desarrollo. Estamos ajustando los packs."
     return jsonify({"status": "proximamente", "mensaje": mensaje, "opciones": ["Pack Parcialito", "Pack Final"]})
 
-# --- RUTA: VER ANUNCIO ---
 @app.route("/ver_anuncio", methods=["POST"])
 def ver_anuncio():
     u = get_usuario_actual()
@@ -258,7 +274,6 @@ def ver_anuncio():
         return jsonify({"error": "No autenticado"}), 401
     if u.bloques_publicidad_vistos >= MAX_BLOQUES_PUBLICIDAD:
         return jsonify({"error": "Máximo de anuncios diarios alcanzado."}), 403
-    # FIX: salto de línea eliminado
     u.bloques_publicidad_vistos += 1
     db.session.commit()
     return jsonify({"res": "Anuncio registrado", "restantes": consultas_permitidas(u) - u.consultas_usadas})
