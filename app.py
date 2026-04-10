@@ -54,10 +54,9 @@ MODEL_ID = "llama-3.3-70b-versatile"
 
 # --- CONSTANTES Y PERFILES ---
 TAREAS_VALIDAS = {"explicar", "resumir", "evaluar", "cargar_material", "preparar_oratoria"}
-MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 2_000
+MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 3_000
 CONSULTAS_BASE, CONSULTAS_POR_AD, MAX_BLOQUES_PUBLICIDAD = 5, 5, 2
 
-# ACTUALIZACIÓN: Se añade el perfil de Abogacía UNLZ
 PERFILES_MATERIA = {
     "higiene": "ROL: Inspector Técnico de Higiene y Seguridad. REGLA: Exige rigor legal (Ley 19587/72 y decretos).",
     "matematica": "ROL: Tutor de Matemática UPE. Explica pasos y teclas de calculadora científica. Usa andamiaje.",
@@ -79,7 +78,7 @@ class Usuario(db.Model):
     ultima_consulta = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     bloques_publicidad_vistos = db.Column(db.Integer, default=0, nullable=False)
     material = db.Column(db.Text, default="")
-    perfil_aprendizaje = db.Column(db.Text, default="")
+    perfil_aprendizaje = db.Column(db.Text, default="{}")
 
 with app.app_context():
     db.create_all()
@@ -101,47 +100,76 @@ def consultas_permitidas(u):
 
 # --- IA LOGIC ---
 def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consigna=""):
-    # Selección de perfil incluyendo el nuevo modo
     perfil_materia = PERFILES_MATERIA.get(materia, "ROL: Mentor Académico Universitario.")
 
+    # FIX: except especificado correctamente
+    try:
+        cognitivo = json.loads(usuario.perfil_aprendizaje)
+    except (json.JSONDecodeError, TypeError):
+        cognitivo = {}
+
     prompt_sistema = f"""{perfil_materia}
-Eres el 'Mentor IA'. Tu objetivo es el entrenamiento cognitivo.
-REGLAS: 1. Usa andamiaje (pistas, no soluciones). 2. Si la tarea es 'evaluar', responde SOLO en JSON con campos: nota, fortalezas, debilidades, sugerencia.
-HISTORIAL: {usuario.perfil_aprendizaje}"""
+Eres el 'Mentor IA'. Tu objetivo es el entrenamiento cognitivo y la excelencia académica.
+
+REGLAS DE EVALUACIÓN:
+1. PENALIZACIÓN DE PLAGIO: Detecta si el alumno copió frases literales del MATERIAL sin elaborar. Si hay copy-paste, la nota no debe superar 5.0. 
+   - EXCEPCIÓN: En 'abogacia' o si la consigna pide 'transcribir', premia la literalidad de leyes o artículos.
+2. ANDAMIAJE: No des respuestas directas en dudas, da pistas que guíen al alumno.
+3. FORMATO JSON: Si la tarea es 'evaluar', responde ESTRICTAMENTE con este JSON:
+{{
+  "grade": nota_0_a_10,
+  "status": "Excelente/Satisfactorio/Insuficiente",
+  "performanceAnalysis": "Análisis pedagógico corto",
+  "sections": {{
+    "mainIdeas": {{"score": 0-10, "feedback": "..."}},
+    "vocabulary": {{"score": 0-10, "feedback": "..."}},
+    "originality": {{"score": 0-10, "feedback": "..."}}
+  }},
+  "strengths": ["punto1", "punto2"],
+  "weaknesses": ["punto1", "punto2"],
+  "omissions": ["Conceptos clave del material que el alumno olvidó"],
+  "improvedVersion": "Cómo debería haber sido la respuesta ideal",
+  "suggestedRetry": "Qué debe repasar para la próxima"
+}}
+
+HISTORIAL COGNITIVO DEL ALUMNO (Fortalezas/Debilidades previas): {json.dumps(cognitivo)}"""
 
     if tarea == "evaluar":
-        # Lógica mejorada para corregir escritos en modo abogacía
-        contexto_eval = "Analiza si el alumno comprendió el material basándose en la consigna."
-        if materia == "abogacia":
-            contexto_eval += " Evalúa especialmente el fundamento legal, el uso de la Constitución Nacional y la precisión técnica jurídica argentina."
-        
-        content = f"CONSIGNA DOCENTE: {consigna}\nMATERIAL DE ESTUDIO: {material}\nRESPUESTA DEL ALUMNO: {texto}\n{contexto_eval}"
+        content = f"CONSIGNA: {consigna}\nMATERIAL BASE: {material}\nRESPUESTA DEL ALUMNO: {texto}\nCompara la respuesta con el material y la consigna. Evalúa rigor y originalidad."
         response_format = {"type": "json_object"}
     else:
-        # Lógica para explicar conceptos en modo abogacía
-        contexto_accion = f"ACCIÓN: {tarea}"
-        if materia == "abogacia" and tarea == "explicar":
-            contexto_accion = "ACCIÓN: Explicar concepto jurídico con profundidad académica de la UNLZ y base constitucional."
-            
-        content = f"CONTEXTO/MATERIAL: {material}\n{contexto_accion}\nENTRADA: {texto}"
+        content = f"CONTEXTO: {material}\nACCIÓN: {tarea}\nENTRADA: {texto}"
         response_format = {"type": "text"}
 
     try:
         completion = client.chat.completions.create(
             model=MODEL_ID,
             messages=[{"role": "system", "content": prompt_sistema}, {"role": "user", "content": content}],
-            temperature=0.7,
+            temperature=0.6,
             response_format=response_format
         )
         res = completion.choices[0].message.content
-        usuario.perfil_aprendizaje = f"[{tarea[:3]}] {res[:50]}...\n{usuario.perfil_aprendizaje}"[:PERFIL_MAX]
+
+        # Actualización del mapa cognitivo
+        if tarea == "evaluar":
+            # FIX: except especificado correctamente
+            try:
+                data_eval = json.loads(res)
+                for w in data_eval.get("weaknesses", []):
+                    cognitivo[w[:20]] = "reforzar"
+                for s in data_eval.get("strengths", []):
+                    cognitivo[s[:20]] = "dominado"
+                nuevo_perfil = dict(list(cognitivo.items())[-10:])
+                usuario.perfil_aprendizaje = json.dumps(nuevo_perfil)
+            except (json.JSONDecodeError, KeyError, TypeError):
+                pass
+
         return res
     except Exception as e:
         logger.error("Error Groq: %s", repr(e))
         return None
 
-# --- RESTO DEL CÓDIGO (RUTAS Y API) ---
-# Se mantiene igual para no romper la funcionalidad actual
+# --- RUTAS ---
 @app.route("/")
 def index():
     u = get_usuario_actual()
@@ -182,7 +210,7 @@ def info_usuario():
     return jsonify({
         "logueado": True,
         "email": u.email,
-        "restantes": permitidas - u.consultas_usadas
+        "restantes": max(0, permitidas - u.consultas_usadas)
     })
 
 @app.route("/<tarea>", methods=["POST"])
@@ -195,6 +223,7 @@ def manejar_tarea(tarea):
 
     data = request.get_json(silent=True) or {}
 
+    # Persistencia de material
     nuevo_material = data.get("material")
     if nuevo_material:
         if len(nuevo_material) > MAX_MATERIAL:
@@ -210,26 +239,26 @@ def manejar_tarea(tarea):
         return jsonify({"error": "Consultas agotadas por hoy."}), 403
 
     texto = data.get("writing", data.get("texto", "")).strip()
-    # Aquí es donde el frontend enviará materia: "abogacia" al activar el interruptor
-    materia = data.get("materia", "general") 
+    materia = data.get("materia", "general")
     consigna = data.get("prompt", "")
 
-    if not texto:
+    if not texto and tarea != "cargar_material":
         return jsonify({"error": "Falta el contenido para procesar."}), 400
+
+    # FIX: Validación de longitud de texto restaurada
     if len(texto) > MAX_TEXTO:
         return jsonify({"error": "Texto muy largo"}), 400
 
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia, consigna)
 
     if res is None:
-        return jsonify({"error": "Error de conexión con la IA. No se descontó consulta."}), 503
+        return jsonify({"error": "Error de conexión con la IA."}), 503
 
     if tarea == "evaluar":
         try:
             resultado = json.loads(res)
-        except json.JSONDecodeError:
-            logger.error("JSON malformado: %s", res)
-            resultado = {"raw": res}
+        except (json.JSONDecodeError, TypeError):
+            resultado = {"grade": 0, "performanceAnalysis": "Error al parsear evaluación.", "raw": res}
     else:
         resultado = res
 
@@ -242,22 +271,20 @@ def manejar_tarea(tarea):
         "restantes": permitidas - u.consultas_usadas
     })
 
-# --- RUTA: NOTIFICACIÓN DE EXAMEN ---
 @app.route("/configurar_examen", methods=["POST"])
 def configurar_examen():
     u = get_usuario_actual()
     if not u:
         return jsonify({"error": "No autenticado"}), 401
     data = request.get_json()
-    materia = data.get("materia")
-    fecha = data.get("fecha")
     try:
-        msg = Message(f"Recordatorio de Examen: {materia}",
+        msg = Message(f"Recordatorio de Examen: {data.get('materia')}",
                       sender=app.config['MAIL_USERNAME'],
                       recipients=[u.email])
-        msg.body = f"Hola!\n\nTu Mentor Académico te recuerda tu fecha de examen para {materia}.\nFecha: {fecha}\n\n¡Éxitos!"
+        msg.body = f"Examen de {data.get('materia')}\nFecha: {data.get('fecha')}\n¡A estudiar!"
         mail.send(msg)
         return jsonify({"res": "Notificación enviada"})
+    # FIX: except con logging del error
     except Exception as e:
         logger.error("Error Mail: %s", e)
         return jsonify({"error": "Error al enviar correo"}), 500
@@ -273,7 +300,8 @@ def ver_anuncio():
     if not u:
         return jsonify({"error": "No autenticado"}), 401
     if u.bloques_publicidad_vistos >= MAX_BLOQUES_PUBLICIDAD:
-        return jsonify({"error": "Máximo de anuncios diarios alcanzado."}), 403
+        # FIX: string sin salto de línea
+        return jsonify({"error": "Máximo diario alcanzado"}), 403
     u.bloques_publicidad_vistos += 1
     db.session.commit()
     return jsonify({"res": "Anuncio registrado", "restantes": consultas_permitidas(u) - u.consultas_usadas})
