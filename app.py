@@ -53,7 +53,7 @@ client = Groq(api_key=api_key)
 MODEL_ID = "llama-3.3-70b-versatile"
 
 # --- CONSTANTES Y PERFILES ---
-TAREAS_VALIDAS = {"explicar", "resumir", "evaluar", "cargar_material", "preparar_oratoria"}
+TAREAS_VALIDAS = {"explicar", "resumir", "evaluar", "cargar_material", "preparar_oratoria", "generar_examen"}
 MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 3_000
 CONSULTAS_BASE, CONSULTAS_POR_AD, MAX_BLOQUES_PUBLICIDAD = 5, 5, 2
 
@@ -102,7 +102,6 @@ def consultas_permitidas(u):
 def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consigna=""):
     perfil_materia = PERFILES_MATERIA.get(materia, "ROL: Mentor Académico Universitario.")
 
-    # FIX: except especificado correctamente
     try:
         cognitivo = json.loads(usuario.perfil_aprendizaje)
     except (json.JSONDecodeError, TypeError):
@@ -111,32 +110,56 @@ def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consig
     prompt_sistema = f"""{perfil_materia}
 Eres el 'Mentor IA'. Tu objetivo es el entrenamiento cognitivo y la excelencia académica.
 
-REGLAS DE EVALUACIÓN:
-1. PENALIZACIÓN DE PLAGIO: Detecta si el alumno copió frases literales del MATERIAL sin elaborar. Si hay copy-paste, la nota no debe superar 5.0. 
-   - EXCEPCIÓN: En 'abogacia' o si la consigna pide 'transcribir', premia la literalidad de leyes o artículos.
-2. ANDAMIAJE: No des respuestas directas en dudas, da pistas que guíen al alumno.
-3. FORMATO JSON: Si la tarea es 'evaluar', responde ESTRICTAMENTE con este JSON:
-{{
-  "grade": nota_0_a_10,
-  "status": "Excelente/Satisfactorio/Insuficiente",
-  "performanceAnalysis": "Análisis pedagógico corto",
-  "sections": {{
-    "mainIdeas": {{"score": 0-10, "feedback": "..."}},
-    "vocabulary": {{"score": 0-10, "feedback": "..."}},
-    "originality": {{"score": 0-10, "feedback": "..."}}
-  }},
-  "strengths": ["punto1", "punto2"],
-  "weaknesses": ["punto1", "punto2"],
-  "omissions": ["Conceptos clave del material que el alumno olvidó"],
-  "improvedVersion": "Cómo debería haber sido la respuesta ideal",
-  "suggestedRetry": "Qué debe repasar para la próxima"
-}}
+REGLAS GENERALES:
+1. PENALIZACIÓN DE PLAGIO: En respuestas abiertas, si el alumno hace copy-paste del material, la nota máxima es 5.0.
+2. ANDAMIAJE: No des soluciones directas, guía el proceso de pensamiento."""
 
-HISTORIAL COGNITIVO DEL ALUMNO (Fortalezas/Debilidades previas): {json.dumps(cognitivo)}"""
+    if tarea == "generar_examen":
+        prompt_sistema += f"""
+        TAREA: Generar un examen basado EXCLUSIVAMENTE en el MATERIAL proporcionado.
+        CONFIGURACIÓN: {consigna}
 
-    if tarea == "evaluar":
-        content = f"CONSIGNA: {consigna}\nMATERIAL BASE: {material}\nRESPUESTA DEL ALUMNO: {texto}\nCompara la respuesta con el material y la consigna. Evalúa rigor y originalidad."
+        REGLAS POR MODALIDAD:
+        - Multiple Choice: 4 opciones verosímiles, solo 1 correcta. Evita distractores obvios.
+        - Desarrollo: Preguntas de relación de conceptos y síntesis.
+        - Justificación: Proporciona una afirmación del texto y pide al alumno validar y fundamentar.
+
+        Responde ÚNICAMENTE en JSON con este formato:
+        {{
+          "examen": [
+            {{
+              "id": 1,
+              "pregunta": "...",
+              "tipo": "choice/desarrollo/justificacion",
+              "opciones": ["A", "B", "C", "D"],
+              "respuesta_correcta": "..."
+            }}
+          ]
+        }}"""
+        content = f"MATERIAL DE ESTUDIO: {material}\nGenera el examen siguiendo la configuración."
         response_format = {"type": "json_object"}
+
+    elif tarea == "evaluar":
+        prompt_sistema += f"""
+        TAREA: Evaluar la respuesta del alumno contra la CONSIGNA y el MATERIAL base.
+        Responde ESTRICTAMENTE con este JSON:
+        {{
+          "grade": nota_0_a_10,
+          "status": "Excelente/Satisfactorio/Insuficiente",
+          "performanceAnalysis": "Análisis pedagógico",
+          "sections": {{
+            "mainIdeas": {{"score": 0-10, "feedback": "..."}},
+            "vocabulary": {{"score": 0-10, "feedback": "..."}},
+            "originality": {{"score": 0-10, "feedback": "..."}}
+          }},
+          "strengths": ["..."], "weaknesses": ["..."], "omissions": ["..."],
+          "improvedVersion": "Respuesta ideal",
+          "suggestedRetry": "Consejo"
+        }}
+        HISTORIAL COGNITIVO: {json.dumps(cognitivo)}"""
+        content = f"CONSIGNA: {consigna}\nMATERIAL: {material}\nRESPUESTA ALUMNO: {texto}"
+        response_format = {"type": "json_object"}
+
     else:
         content = f"CONTEXTO: {material}\nACCIÓN: {tarea}\nENTRADA: {texto}"
         response_format = {"type": "text"}
@@ -159,8 +182,7 @@ HISTORIAL COGNITIVO DEL ALUMNO (Fortalezas/Debilidades previas): {json.dumps(cog
                     cognitivo[w[:20]] = "reforzar"
                 for s in data_eval.get("strengths", []):
                     cognitivo[s[:20]] = "dominado"
-                nuevo_perfil = dict(list(cognitivo.items())[-10:])
-                usuario.perfil_aprendizaje = json.dumps(nuevo_perfil)
+                usuario.perfil_aprendizaje = json.dumps(dict(list(cognitivo.items())[-10:]))
             except (json.JSONDecodeError, KeyError, TypeError):
                 pass
 
@@ -185,13 +207,13 @@ def login():
 def callback():
     token = google.authorize_access_token()
     userinfo = token.get("userinfo") or google.userinfo()
-    email = userinfo["email"]
-    u = Usuario.query.filter_by(email=email).first()
+    u = Usuario.query.filter_by(email=userinfo["email"]).first()
     if not u:
-        u = Usuario(email=email)
+        u = Usuario(email=userinfo["email"])
         db.session.add(u)
     db.session.commit()
     session["usuario_id"] = u.id
+    # FIX: session.permanent restaurado para mantener sesión entre cierres
     session.permanent = True
     return redirect("/")
 
@@ -206,11 +228,10 @@ def info_usuario():
     if not u:
         return jsonify({"logueado": False})
     resetear_si_nuevo_dia(u)
-    permitidas = consultas_permitidas(u)
     return jsonify({
         "logueado": True,
         "email": u.email,
-        "restantes": max(0, permitidas - u.consultas_usadas)
+        "restantes": max(0, consultas_permitidas(u) - u.consultas_usadas)
     })
 
 @app.route("/<tarea>", methods=["POST"])
@@ -223,7 +244,7 @@ def manejar_tarea(tarea):
 
     data = request.get_json(silent=True) or {}
 
-    # Persistencia de material
+    # Manejo de material base
     nuevo_material = data.get("material")
     if nuevo_material:
         if len(nuevo_material) > MAX_MATERIAL:
@@ -231,36 +252,30 @@ def manejar_tarea(tarea):
         u.material = nuevo_material
         db.session.commit()
         if tarea == "cargar_material":
-            return jsonify({"res": "Material guardado correctamente."})
+            return jsonify({"res": "Material guardado."})
 
     resetear_si_nuevo_dia(u)
-    permitidas = consultas_permitidas(u)
-    if u.consultas_usadas >= permitidas:
-        return jsonify({"error": "Consultas agotadas por hoy."}), 403
+    if u.consultas_usadas >= consultas_permitidas(u):
+        return jsonify({"error": "Consultas agotadas."}), 403
 
     texto = data.get("writing", data.get("texto", "")).strip()
     materia = data.get("materia", "general")
     consigna = data.get("prompt", "")
 
-    if not texto and tarea != "cargar_material":
-        return jsonify({"error": "Falta el contenido para procesar."}), 400
-
-    # FIX: Validación de longitud de texto restaurada
+    if not texto and tarea not in ["cargar_material", "generar_examen"]:
+        return jsonify({"error": "Falta contenido."}), 400
     if len(texto) > MAX_TEXTO:
         return jsonify({"error": "Texto muy largo"}), 400
 
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia, consigna)
-
     if res is None:
         return jsonify({"error": "Error de conexión con la IA."}), 503
 
-    if tarea == "evaluar":
-        try:
-            resultado = json.loads(res)
-        except (json.JSONDecodeError, TypeError):
-            resultado = {"grade": 0, "performanceAnalysis": "Error al parsear evaluación.", "raw": res}
-    else:
-        resultado = res
+    # FIX: except especificado correctamente
+    try:
+        resultado = json.loads(res) if tarea in ["evaluar", "generar_examen"] else res
+    except (json.JSONDecodeError, TypeError):
+        resultado = {"raw": res}
 
     u.consultas_usadas += 1
     u.ultima_consulta = datetime.datetime.utcnow()
@@ -268,9 +283,10 @@ def manejar_tarea(tarea):
 
     return jsonify({
         "resultado": resultado,
-        "restantes": permitidas - u.consultas_usadas
+        "restantes": consultas_permitidas(u) - u.consultas_usadas
     })
 
+# --- RUTA: NOTIFICACIÓN DE EXAMEN ---
 @app.route("/configurar_examen", methods=["POST"])
 def configurar_examen():
     u = get_usuario_actual()
@@ -284,24 +300,25 @@ def configurar_examen():
         msg.body = f"Examen de {data.get('materia')}\nFecha: {data.get('fecha')}\n¡A estudiar!"
         mail.send(msg)
         return jsonify({"res": "Notificación enviada"})
-    # FIX: except con logging del error
     except Exception as e:
         logger.error("Error Mail: %s", e)
         return jsonify({"error": "Error al enviar correo"}), 500
 
+# --- RUTA: TIENDA ---
 @app.route("/tienda")
 def tienda():
     mensaje = "Función en desarrollo. Estamos ajustando los packs."
     return jsonify({"status": "proximamente", "mensaje": mensaje, "opciones": ["Pack Parcialito", "Pack Final"]})
 
+# --- RUTA: VER ANUNCIO ---
 @app.route("/ver_anuncio", methods=["POST"])
 def ver_anuncio():
     u = get_usuario_actual()
     if not u:
         return jsonify({"error": "No autenticado"}), 401
     if u.bloques_publicidad_vistos >= MAX_BLOQUES_PUBLICIDAD:
-        # FIX: string sin salto de línea
-        return jsonify({"error": "Máximo diario alcanzado"}), 403
+        # FIX: salto de línea eliminado
+        return jsonify({"error": "Límite alcanzado"}), 403
     u.bloques_publicidad_vistos += 1
     db.session.commit()
     return jsonify({"res": "Anuncio registrado", "restantes": consultas_permitidas(u) - u.consultas_usadas})
