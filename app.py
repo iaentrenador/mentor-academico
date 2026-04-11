@@ -59,10 +59,32 @@ MODEL_ID = "llama-3.3-70b-versatile"
 # --- CONSTANTES Y PERFILES ---
 TAREAS_VALIDAS = {
     "explicar", "resumir", "evaluar", "cargar_material",
-    "preparar_oratoria", "generar_examen", "generar_rap", "generar_red"
+    "preparar_oratoria", "generar_examen", "generar_rap", "generar_red",
+    # NUEVAS TAREAS portadas desde AI Studio
+    "corregir_escrito", "corregir_resumen", "explicar_concepto"
 }
 MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 3_000
 CONSULTAS_BASE, CONSULTAS_POR_AD, MAX_BLOQUES_PUBLICIDAD = 5, 5, 2
+
+# Persona académica base portada desde AI Studio
+ACADEMIC_COACH_PERSONA = """Eres un entrenador académico universitario especializado en comprensión de textos, desarrollo conceptual y mejora de respuestas escritas.
+Tu objetivo no es hacer las tareas por el estudiante, sino entrenar su pensamiento académico.
+Siempre debes comportarte como un docente universitario que evalúa y orienta el aprendizaje.
+
+REGLAS IMPORTANTES:
+1. Nunca escribas la respuesta completa al ejercicio por el estudiante.
+2. No resuelvas consignas directamente.
+3. Tu tarea es evaluar, orientar y explicar.
+4. Puedes aclarar conceptos, dar ejemplos y sugerir mejoras.
+5. El estudiante debe construir su propia respuesta.
+
+Cuando evalúes una respuesta debes usar SIEMPRE la siguiente estructura en tus campos de retroalimentación:
+1. Calificación estimada: Indica una calificación aproximada sobre 10.
+2. Análisis del desempeño: Explica qué tan bien comprendió el estudiante el contenido.
+3. Fortalezas: Indica qué aspectos de la respuesta están bien logrados.
+4. Aspectos a mejorar: Señala conceptos faltantes, errores o problemas en la explicación.
+5. Sugerencias de mejora: Explica cómo podría mejorar su respuesta.
+6. Reintento sugerido: Invita al estudiante a mejorar su respuesta y volver a intentarlo."""
 
 PERFILES_MATERIA = {
     "higiene": "ROL: Inspector Técnico de Higiene y Seguridad. REGLA: Exige rigor legal (Ley 19587/72 y decretos).",
@@ -109,67 +131,146 @@ def consultas_permitidas(u):
 def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consigna=""):
     perfil_materia = PERFILES_MATERIA.get(materia, "ROL: Mentor Académico Universitario.")
 
-    persona_academica = """
-    REGLAS DE ENTRENADOR:
-    1. Nunca resuelvas la tarea directamente.
-    2. Si es una pregunta conceptual, explica con profundidad y ejemplos.
-    3. Si es una consigna, identifica conceptos necesarios y guía los pasos lógicos.
-    4. Usa siempre la estructura de evaluación de 6 puntos:
-       - Nota (0-10)
-       - Análisis desempeño
-       - Fortalezas
-       - Aspectos a mejorar
-       - Sugerencias
-       - Reintento sugerido.
-    """
+    try:
+        cognitivo = json.loads(usuario.perfil_aprendizaje)
+    except (json.JSONDecodeError, TypeError):
+        cognitivo = {}
 
-    prompt_sistema = f"{perfil_materia}\n{persona_academica}"
     response_format = {"type": "text"}
+    prompt_sistema = f"{ACADEMIC_COACH_PERSONA}\n{perfil_materia}"
 
-    if tarea == "generar_examen":
-        prompt_sistema += "\nTAREA: Generar examen único en JSON."
-        content = f"MATERIAL: {material}\nGenerar examen dinámico."
+    # --- TAREA: CORREGIR ESCRITO (portada desde correctWriting de AI Studio) ---
+    if tarea == "corregir_escrito":
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}
+{perfil_materia}
+
+TAREA: Corregir el escrito del estudiante con criterios universitarios.
+Evalúa con rigor académico siguiendo la estructura de 6 puntos.
+Responde ESTRICTAMENTE con este JSON:
+{{
+  "grade": nota_0_a_10,
+  "status": "Excelente/Satisfactorio/Insuficiente",
+  "performanceAnalysis": "Análisis del desempeño",
+  "strengths": ["fortaleza1", "fortaleza2"],
+  "weaknesses": ["debilidad1", "debilidad2"],
+  "improvementSuggestions": ["sugerencia1", "sugerencia2"],
+  "suggestedRetry": "Invitación a mejorar",
+  "omissions": ["concepto omitido1", "concepto omitido2"],
+  "improvedVersion": "Ejemplo de cómo mejorar sin resolver completamente",
+  "sections": {{
+    "structure": {{"score": 0-10, "feedback": "..."}},
+    "content": {{"score": 0-10, "feedback": "..."}},
+    "vocabulary": {{"score": 0-10, "feedback": "..."}},
+    "originality": {{"score": 0-10, "feedback": "..."}}
+  }}
+}}"""
+        content = f"CONSIGNA DEL PROFESOR: {consigna}\nMATERIAL DE REFERENCIA: {material}\nESCRITO DEL ESTUDIANTE: {texto}"
         response_format = {"type": "json_object"}
 
+    # --- TAREA: CORREGIR RESUMEN (portada desde evaluateSummary de AI Studio) ---
+    elif tarea == "corregir_resumen":
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}
+{perfil_materia}
+
+TAREA: Evaluar el resumen del estudiante comparándolo con el texto fuente.
+Responde ESTRICTAMENTE con este JSON:
+{{
+  "grade": nota_0_a_10,
+  "status": "Excelente/Satisfactorio/Insuficiente",
+  "performanceAnalysis": "Análisis del desempeño",
+  "strengths": ["fortaleza1", "fortaleza2"],
+  "weaknesses": ["aspecto a mejorar1", "aspecto a mejorar2"],
+  "improvementSuggestions": ["sugerencia1", "sugerencia2"],
+  "suggestedRetry": "Invitación a mejorar",
+  "omissions": ["idea clave omitida1", "idea clave omitida2"],
+  "improvedVersion": "Versión superadora de ejemplo (sin resolver todo)"
+}}"""
+        content = f"TEXTO FUENTE ORIGINAL: {material}\nRESUMEN DEL ESTUDIANTE: {texto}"
+        response_format = {"type": "json_object"}
+
+    # --- TAREA: EXPLICAR CONCEPTO (portada desde explainConcept de AI Studio) ---
+    elif tarea == "explicar_concepto":
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}
+{perfil_materia}
+
+INSTRUCCIONES ESPECÍFICAS:
+1. Si la solicitud es una pregunta conceptual, explícala con profundidad académica y ejemplos.
+2. SI LA SOLICITUD ES UNA CONSIGNA DE EJERCICIO O TAREA:
+   - NO LA RESUELVAS.
+   - Identifica los conceptos teóricos necesarios para resolverla.
+   - Explica esos conceptos de forma clara.
+   - Proporciona ejemplos similares pero diferentes al ejercicio planteado.
+   - Guía al estudiante sobre qué pasos lógicos debe seguir para llegar a la solución por su cuenta.
+3. Mantén siempre el tono de un mentor universitario.
+
+Responde ESTRICTAMENTE con este JSON:
+{{
+  "explanation": "Explicación didáctica completa",
+  "examples": ["ejemplo1", "ejemplo2"],
+  "keyTakeaways": ["punto clave1", "punto clave2"],
+  "relatedConcepts": ["concepto relacionado1", "concepto relacionado2"]
+}}"""
+        content = f"CONTEXTO DE ESTUDIO: {material}\nSOLICITUD DEL ESTUDIANTE: {texto}"
+        response_format = {"type": "json_object"}
+
+    # --- TAREA: GENERAR EXAMEN ---
+    elif tarea == "generar_examen":
+        prompt_sistema += "\nTAREA: Generar examen único basado EXCLUSIVAMENTE en el material."
+        content = f"MATERIAL: {material}\nCONFIGURACIÓN: {consigna}\nGenera el examen."
+        response_format = {"type": "json_object"}
+
+    # --- TAREA: EVALUAR ---
     elif tarea == "evaluar":
-        prompt_sistema += """
-        TAREA: Evaluar con rigor del 70%.
-        Responde ESTRICTAMENTE con este JSON que incluye tu estructura de 6 puntos:
-        {
-          "grade": nota, "status": "...", "performanceAnalysis": "...",
-          "strengths": [], "weaknesses": [], "improvementSuggestions": [],
-          "suggestedRetry": "...", "improvedVersion": "...", "isPromoted": bool,
-          "sections": {
-            "mainIdeas": {"score": 0-10, "feedback": "..."},
-            "cohesion_coherence": {"score": 0-10, "feedback": "..."},
-            "academic_rigor": {"score": 0-10, "feedback": "..."}
-          }
-        }"""
+        prompt_sistema += f"""
+        TAREA: Evaluar la respuesta del alumno contra la CONSIGNA y el MATERIAL base.
+        Responde ESTRICTAMENTE con este JSON:
+        {{
+          "grade": nota_0_a_10,
+          "status": "Excelente/Satisfactorio/Insuficiente",
+          "performanceAnalysis": "Análisis pedagógico",
+          "sections": {{
+            "mainIdeas": {{"score": 0-10, "feedback": "..."}},
+            "cohesion_coherence": {{"score": 0-10, "feedback": "..."}},
+            "academic_rigor": {{"score": 0-10, "feedback": "..."}}
+          }},
+          "strengths": ["..."], "weaknesses": ["..."], "improvementSuggestions": ["..."],
+          "omissions": ["..."], "improvedVersion": "...", "suggestedRetry": "...",
+          "isPromoted": true/false
+        }}
+        HISTORIAL COGNITIVO: {json.dumps(cognitivo)}"""
         content = f"CONSIGNA: {consigna}\nMATERIAL: {material}\nRESPUESTA ALUMNO: {texto}"
         response_format = {"type": "json_object"}
 
+    # --- TAREA: GENERAR RAP ---
     elif tarea == "generar_rap":
         prompt_sistema += """
         TAREA: Crear un 'Rap Técnico' para memorización.
         REGLAS: Mantén el orden lógico, incluye TODAS las fechas y términos técnicos.
         Usa lenguaje literal (nada de metáforas poéticas).
-        Responde en JSON con campos: 'title', 'verses' (lista) y 'evaluation' (rúbrica de 100 pts)."""
+        Responde en JSON:
+        {"title": "...", "verses": ["verso1", "verso2"],
+         "evaluation": {"totalScore": 0-100, "status": "...", "professorFeedback": "...",
+           "rubric": {"fidelity": 0-40, "order": 0-20, "terminology": 0-20, "data": 0-10, "clarity": 0-10}}}"""
         content = f"TEXTO BASE: {material if material else texto}"
         response_format = {"type": "json_object"}
 
+    # --- TAREA: GENERAR RED CONCEPTUAL ---
     elif tarea == "generar_red":
         prompt_sistema += """
-        TAREA: Construir una Red Conceptual.
+        TAREA: Construir una Red Conceptual detallada.
         Responde en JSON:
-        { "title": "...", "nodes": [{"id": "...", "label": "...", "type": "core/main/secondary"}],
-          "edges": [{"from": "...", "to": "...", "label": "..."}], "summary": "..." }"""
+        {"title": "...", "summary": "...",
+         "nodes": [{"id": "...", "label": "...", "type": "core/main/secondary"}],
+         "edges": [{"from": "...", "to": "...", "label": "..."}]}"""
         content = f"TEXTO: {material if material else texto}"
         response_format = {"type": "json_object"}
 
+    # --- TAREA: EXPLICAR ---
     elif tarea == "explicar":
         prompt_sistema += "\nSi es una consigna, NO la resuelvas. Explica conceptos y da ejemplos similares."
         content = f"CONTEXTO: {material}\nSOLICITUD: {texto}"
 
+    # --- RESTO DE TAREAS ---
     else:
         content = f"CONTEXTO: {material}\nACCIÓN: {tarea}\nENTRADA: {texto}"
 
@@ -180,7 +281,21 @@ def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consig
             temperature=0.7,
             response_format=response_format,
         )
-        return completion.choices[0].message.content
+        res = completion.choices[0].message.content
+
+        # Actualización del mapa cognitivo solo en evaluaciones
+        if tarea in ["evaluar", "corregir_escrito", "corregir_resumen"]:
+            try:
+                data_eval = json.loads(res)
+                for w in data_eval.get("weaknesses", []):
+                    cognitivo[w[:20]] = "reforzar"
+                for s in data_eval.get("strengths", []):
+                    cognitivo[s[:20]] = "dominado"
+                usuario.perfil_aprendizaje = json.dumps(dict(list(cognitivo.items())[-10:]))
+            except (json.JSONDecodeError, KeyError, TypeError):
+                pass
+
+        return res
     except Exception as e:
         logger.error("Error IA: %s", repr(e))
         return None
@@ -205,7 +320,6 @@ def callback():
         db.session.add(u)
     db.session.commit()
     session["usuario_id"] = u.id
-    # FIX: session.permanent restaurado
     session.permanent = True
     return redirect("/")
 
@@ -226,7 +340,6 @@ def info_usuario():
         "restantes": max(0, consultas_permitidas(u) - u.consultas_usadas)
     })
 
-# FIX: ruta restaurada a /<tarea> para compatibilidad con el frontend
 @app.route("/<tarea>", methods=["POST"])
 def manejar_tarea(tarea):
     if tarea not in TAREAS_VALIDAS:
@@ -256,19 +369,22 @@ def manejar_tarea(tarea):
     materia = data.get("materia", "general")
     consigna = data.get("prompt", "")
 
-    if not texto and tarea not in ["cargar_material", "generar_examen", "generar_rap", "generar_red"]:
+    tareas_sin_texto = ["cargar_material", "generar_examen", "generar_rap", "generar_red"]
+    if not texto and tarea not in tareas_sin_texto:
         return jsonify({"error": "Falta contenido."}), 400
     if len(texto) > MAX_TEXTO:
         return jsonify({"error": "Texto muy largo"}), 400
 
-    # FIX: la IA se llama ANTES de descontar la consulta
+    # IA se llama ANTES de descontar la consulta
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia, consigna)
     if res is None:
         return jsonify({"error": "Error de conexión con la IA. No se descontó tu consulta."}), 503
 
-    # FIX: except especificado correctamente
+    # Tareas que devuelven JSON estructurado
+    tareas_json = ["evaluar", "generar_examen", "generar_rap", "generar_red",
+                   "corregir_escrito", "corregir_resumen", "explicar_concepto"]
     try:
-        resultado = json.loads(res) if tarea in ["evaluar", "generar_examen", "generar_rap", "generar_red"] else res
+        resultado = json.loads(res) if tarea in tareas_json else res
     except (json.JSONDecodeError, TypeError):
         resultado = res
 
@@ -312,10 +428,8 @@ def ver_anuncio():
     u = get_usuario_actual()
     if not u:
         return jsonify({"error": "No autenticado"}), 401
-    # FIX: límite de MAX_BLOQUES_PUBLICIDAD restaurado
     if u.bloques_publicidad_vistos >= MAX_BLOQUES_PUBLICIDAD:
         return jsonify({"error": "Límite diario de anuncios alcanzado. Volvé mañana."}), 403
-    # FIX: salto de línea eliminado
     u.bloques_publicidad_vistos += 1
     db.session.commit()
     return jsonify({"res": "Anuncio registrado", "restantes": consultas_permitidas(u) - u.consultas_usadas})
