@@ -32,7 +32,7 @@
         .btn-corregir { background: #e67e22; }
         .btn-concepto { background: #16a085; }
         .btn-resumen { background: #8e44ad; }
-
+        
         /* --- ESTILOS SIMULACRO --- */
         .exam-container { background: #fff; border-radius: 15px; border: 1px solid #ddd; animation: fadeIn 0.4s; }
         .progress-container { width: 100%; height: 10px; background: #eee; border-radius: 5px; margin-bottom: 20px; overflow: hidden; }
@@ -75,7 +75,6 @@
         <div class="logo-container">
             <img src="https://lh3.googleusercontent.com/u/0/d/1KljzH443DnPqM5P1TDXjfXsrac4D-5Hz=w1000" alt="Logo Mentor IA" class="logo-mentor">
         </div>
-
         <h1>Mentor IA Académico</h1>
         <div class="subtitle">Entrenador especializado - Proyecto V.A.L.F.</div>
 
@@ -321,8 +320,33 @@
             }
         }
 
-        function renderizarFeedbackAcademico(resIA) {
-            const resDiv = document.getElementById('resultado');
-            const nota = resIA.grade ?? 'S/N';
-            const status = resIA.status || '';
-            const badgeClass
+        // FIX: programarExamen con try/catch y validación
+        async function programarExamen() {
+            const mat = document.getElementById('exam-materia').value;
+            const fec = document.getElementById('exam-fecha').value;
+            if (!mat || !fec) return alert("Completá materia y fecha.");
+            try {
+                const res = await fetch('/configurar_examen', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ materia: mat, fecha: fec })
+                });
+const data = await res.json();
+                alert(data.res || data.error || "Notificación programada.");
+            } catch (err) {
+                alert("Error al programar alerta.");
+            }
+        }
+ 
+        async function verTienda() {
+            try {
+                const response = await fetch('/tienda');
+                const data = await response.json();
+                alert(`🏪 TIENDA MENTOR\n\n${data.mensaje || 'En desarrollo.'}`);
+            } catch (err) {
+                alert("La tienda no está disponible.");
+            }
+        }
+    </script>
+</body>
+</html>
