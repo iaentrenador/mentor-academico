@@ -60,13 +60,11 @@ MODEL_ID = "llama-3.3-70b-versatile"
 TAREAS_VALIDAS = {
     "explicar", "resumir", "evaluar", "cargar_material",
     "preparar_oratoria", "generar_examen", "generar_rap", "generar_red",
-    # NUEVAS TAREAS portadas desde AI Studio
-    "corregir_escrito", "corregir_resumen", "explicar_concepto"
+    "corregir_escrito", "corregir_resumen", "explicar_concepto", "evaluar_simulacro"
 }
 MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 3_000
 CONSULTAS_BASE, CONSULTAS_POR_AD, MAX_BLOQUES_PUBLICIDAD = 5, 5, 2
 
-# Persona académica base portada desde AI Studio
 ACADEMIC_COACH_PERSONA = """Eres un entrenador académico universitario especializado en comprensión de textos, desarrollo conceptual y mejora de respuestas escritas.
 Tu objetivo no es hacer las tareas por el estudiante, sino entrenar su pensamiento académico.
 Siempre debes comportarte como un docente universitario que evalúa y orienta el aprendizaje.
@@ -139,24 +137,57 @@ def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consig
     response_format = {"type": "text"}
     prompt_sistema = f"{ACADEMIC_COACH_PERSONA}\n{perfil_materia}"
 
-    # --- TAREA: CORREGIR ESCRITO (portada desde correctWriting de AI Studio) ---
-    if tarea == "corregir_escrito":
+    # --- TAREA: GENERAR EXAMEN (Simulacro dinámico) ---
+    if tarea == "generar_examen":
+        prompt_sistema = f"""{perfil_materia}
+Eres un Profesor Universitario creando un examen de opción múltiple. 
+Utiliza el material proporcionado para crear preguntas desafiantes.
+Responde ESTRICTAMENTE con este JSON:
+{{
+  "title": "Nombre del Examen",
+  "questions": [
+    {{
+      "id": 1,
+      "question": "Pregunta...",
+      "answerOptions": ["opcion A", "opcion B", "opcion C", "opcion D"],
+      "correctAnswerIndex": 0
+    }}
+  ]
+}}"""
+        content = f"MATERIAL PARA EL EXAMEN: {material if material else 'Generar preguntas generales de ' + materia}"
+        response_format = {"type": "json_object"}
+
+    # --- TAREA: EVALUAR SIMULACRO (Feedback detallado de examen) ---
+    elif tarea == "evaluar_simulacro":
         prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}
 {perfil_materia}
-
-TAREA: Corregir el escrito del estudiante con criterios universitarios.
-Evalúa con rigor académico siguiendo la estructura de 6 puntos.
+TAREA: Evaluar los resultados de un simulacro de examen realizado por el estudiante.
+Analiza sus aciertos y errores y brinda retroalimentación con rigor académico.
 Responde ESTRICTAMENTE con este JSON:
 {{
   "grade": nota_0_a_10,
   "status": "Excelente/Satisfactorio/Insuficiente",
-  "performanceAnalysis": "Análisis del desempeño",
-  "strengths": ["fortaleza1", "fortaleza2"],
-  "weaknesses": ["debilidad1", "debilidad2"],
-  "improvementSuggestions": ["sugerencia1", "sugerencia2"],
-  "suggestedRetry": "Invitación a mejorar",
-  "omissions": ["concepto omitido1", "concepto omitido2"],
-  "improvedVersion": "Ejemplo de cómo mejorar sin resolver completamente",
+  "performanceAnalysis": "Análisis del desempeño en el examen",
+  "strengths": ["tema dominado 1", "tema dominado 2"],
+  "weaknesses": ["tema a reforzar 1", "tema a reforzar 2"],
+  "improvementSuggestions": ["estudiar X", "revisar concepto Y"],
+  "suggestedRetry": "Sugerencia de reintento",
+  "sections": {{
+    "teoria": {{"score": 0-10, "feedback": "..."}},
+    "aplicacion": {{"score": 0-10, "feedback": "..."}}
+  }}
+}}"""
+        content = f"MATERIAL DE REFERENCIA: {material}\nRESULTADOS DEL SIMULACRO (Respuestas del usuario vs correctas): {texto}"
+        response_format = {"type": "json_object"}
+
+    elif tarea == "corregir_escrito":
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
+TAREA: Corregir el escrito del estudiante. Evalúa con rigor siguiendo la estructura de 6 puntos.
+Responde ESTRICTAMENTE con este JSON:
+{{
+  "grade": 0-10, "status": "...", "performanceAnalysis": "...",
+  "strengths": [], "weaknesses": [], "improvementSuggestions": [],
+  "suggestedRetry": "...", "omissions": [], "improvedVersion": "...",
   "sections": {{
     "structure": {{"score": 0-10, "feedback": "..."}},
     "content": {{"score": 0-10, "feedback": "..."}},
@@ -164,113 +195,57 @@ Responde ESTRICTAMENTE con este JSON:
     "originality": {{"score": 0-10, "feedback": "..."}}
   }}
 }}"""
-        content = f"CONSIGNA DEL PROFESOR: {consigna}\nMATERIAL DE REFERENCIA: {material}\nESCRITO DEL ESTUDIANTE: {texto}"
+        content = f"CONSIGNA: {consigna}\nMATERIAL: {material}\nESCRITO: {texto}"
         response_format = {"type": "json_object"}
 
-    # --- TAREA: CORREGIR RESUMEN (portada desde evaluateSummary de AI Studio) ---
     elif tarea == "corregir_resumen":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}
-{perfil_materia}
-
-TAREA: Evaluar el resumen del estudiante comparándolo con el texto fuente.
-Responde ESTRICTAMENTE con este JSON:
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
+TAREA: Evaluar el resumen. Responde ESTRICTAMENTE con este JSON:
 {{
-  "grade": nota_0_a_10,
-  "status": "Excelente/Satisfactorio/Insuficiente",
-  "performanceAnalysis": "Análisis del desempeño",
-  "strengths": ["fortaleza1", "fortaleza2"],
-  "weaknesses": ["aspecto a mejorar1", "aspecto a mejorar2"],
-  "improvementSuggestions": ["sugerencia1", "sugerencia2"],
-  "suggestedRetry": "Invitación a mejorar",
-  "omissions": ["idea clave omitida1", "idea clave omitida2"],
-  "improvedVersion": "Versión superadora de ejemplo (sin resolver todo)"
+  "grade": 0-10, "status": "...", "performanceAnalysis": "...",
+  "strengths": [], "weaknesses": [], "improvementSuggestions": [],
+  "suggestedRetry": "...", "omissions": [], "improvedVersion": "..."
 }}"""
-        content = f"TEXTO FUENTE ORIGINAL: {material}\nRESUMEN DEL ESTUDIANTE: {texto}"
+        content = f"FUENTE: {material}\nRESUMEN: {texto}"
         response_format = {"type": "json_object"}
 
-    # --- TAREA: EXPLICAR CONCEPTO (portada desde explainConcept de AI Studio) ---
     elif tarea == "explicar_concepto":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}
-{perfil_materia}
-
-INSTRUCCIONES ESPECÍFICAS:
-1. Si la solicitud es una pregunta conceptual, explícala con profundidad académica y ejemplos.
-2. SI LA SOLICITUD ES UNA CONSIGNA DE EJERCICIO O TAREA:
-   - NO LA RESUELVAS.
-   - Identifica los conceptos teóricos necesarios para resolverla.
-   - Explica esos conceptos de forma clara.
-   - Proporciona ejemplos similares pero diferentes al ejercicio planteado.
-   - Guía al estudiante sobre qué pasos lógicos debe seguir para llegar a la solución por su cuenta.
-3. Mantén siempre el tono de un mentor universitario.
-
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
 Responde ESTRICTAMENTE con este JSON:
 {{
-  "explanation": "Explicación didáctica completa",
-  "examples": ["ejemplo1", "ejemplo2"],
-  "keyTakeaways": ["punto clave1", "punto clave2"],
-  "relatedConcepts": ["concepto relacionado1", "concepto relacionado2"]
+  "explanation": "...", "examples": [], "keyTakeaways": [], "relatedConcepts": []
 }}"""
-        content = f"CONTEXTO DE ESTUDIO: {material}\nSOLICITUD DEL ESTUDIANTE: {texto}"
+        content = f"CONTEXTO: {material}\nSOLICITUD: {texto}"
         response_format = {"type": "json_object"}
 
-    # --- TAREA: GENERAR EXAMEN ---
-    elif tarea == "generar_examen":
-        prompt_sistema += "\nTAREA: Generar examen único basado EXCLUSIVAMENTE en el material."
-        content = f"MATERIAL: {material}\nCONFIGURACIÓN: {consigna}\nGenera el examen."
-        response_format = {"type": "json_object"}
-
-    # --- TAREA: EVALUAR ---
     elif tarea == "evaluar":
         prompt_sistema += f"""
-        TAREA: Evaluar la respuesta del alumno contra la CONSIGNA y el MATERIAL base.
-        Responde ESTRICTAMENTE con este JSON:
+        TAREA: Evaluar la respuesta. Responde ESTRICTAMENTE con este JSON:
         {{
-          "grade": nota_0_a_10,
-          "status": "Excelente/Satisfactorio/Insuficiente",
-          "performanceAnalysis": "Análisis pedagógico",
+          "grade": 0-10, "status": "...", "performanceAnalysis": "...",
           "sections": {{
             "mainIdeas": {{"score": 0-10, "feedback": "..."}},
-            "cohesion_coherence": {{"score": 0-10, "feedback": "..."}},
-            "academic_rigor": {{"score": 0-10, "feedback": "..."}}
+            "cohesion": {{"score": 0-10, "feedback": "..."}}
           }},
-          "strengths": ["..."], "weaknesses": ["..."], "improvementSuggestions": ["..."],
-          "omissions": ["..."], "improvedVersion": "...", "suggestedRetry": "...",
-          "isPromoted": true/false
-        }}
-        HISTORIAL COGNITIVO: {json.dumps(cognitivo)}"""
-        content = f"CONSIGNA: {consigna}\nMATERIAL: {material}\nRESPUESTA ALUMNO: {texto}"
+          "strengths": [], "weaknesses": [], "improvementSuggestions": [],
+          "omissions": [], "improvedVersion": "...", "suggestedRetry": "..."
+        }}"""
+        content = f"CONSIGNA: {consigna}\nMATERIAL: {material}\nRESPUESTA: {texto}"
         response_format = {"type": "json_object"}
 
-    # --- TAREA: GENERAR RAP ---
     elif tarea == "generar_rap":
-        prompt_sistema += """
-        TAREA: Crear un 'Rap Técnico' para memorización.
-        REGLAS: Mantén el orden lógico, incluye TODAS las fechas y términos técnicos.
-        Usa lenguaje literal (nada de metáforas poéticas).
-        Responde en JSON:
-        {"title": "...", "verses": ["verso1", "verso2"],
-         "evaluation": {"totalScore": 0-100, "status": "...", "professorFeedback": "...",
-           "rubric": {"fidelity": 0-40, "order": 0-20, "terminology": 0-20, "data": 0-10, "clarity": 0-10}}}"""
-        content = f"TEXTO BASE: {material if material else texto}"
-        response_format = {"type": "json_object"}
-
-    # --- TAREA: GENERAR RED CONCEPTUAL ---
-    elif tarea == "generar_red":
-        prompt_sistema += """
-        TAREA: Construir una Red Conceptual detallada.
-        Responde en JSON:
-        {"title": "...", "summary": "...",
-         "nodes": [{"id": "...", "label": "...", "type": "core/main/secondary"}],
-         "edges": [{"from": "...", "to": "...", "label": "..."}]}"""
+        prompt_sistema += """Responde en JSON: {"title": "...", "verses": [], "evaluation": {"totalScore": 0-100, "status": "...", "professorFeedback": "..."}}"""
         content = f"TEXTO: {material if material else texto}"
         response_format = {"type": "json_object"}
 
-    # --- TAREA: EXPLICAR ---
+    elif tarea == "generar_red":
+        prompt_sistema += """Responde en JSON: {"title": "...", "summary": "...", "nodes": [], "edges": []}"""
+        content = f"TEXTO: {material if material else texto}"
+        response_format = {"type": "json_object"}
+
     elif tarea == "explicar":
-        prompt_sistema += "\nSi es una consigna, NO la resuelvas. Explica conceptos y da ejemplos similares."
         content = f"CONTEXTO: {material}\nSOLICITUD: {texto}"
 
-    # --- RESTO DE TAREAS ---
     else:
         content = f"CONTEXTO: {material}\nACCIÓN: {tarea}\nENTRADA: {texto}"
 
@@ -283,17 +258,13 @@ Responde ESTRICTAMENTE con este JSON:
         )
         res = completion.choices[0].message.content
 
-        # Actualización del mapa cognitivo solo en evaluaciones
-        if tarea in ["evaluar", "corregir_escrito", "corregir_resumen"]:
+        if tarea in ["evaluar", "corregir_escrito", "corregir_resumen", "evaluar_simulacro"]:
             try:
                 data_eval = json.loads(res)
-                for w in data_eval.get("weaknesses", []):
-                    cognitivo[w[:20]] = "reforzar"
-                for s in data_eval.get("strengths", []):
-                    cognitivo[s[:20]] = "dominado"
+                for w in data_eval.get("weaknesses", []): cognitivo[w[:20]] = "reforzar"
+                for s in data_eval.get("strengths", []): cognitivo[s[:20]] = "dominado"
                 usuario.perfil_aprendizaje = json.dumps(dict(list(cognitivo.items())[-10:]))
-            except (json.JSONDecodeError, KeyError, TypeError):
-                pass
+            except: pass
 
         return res
     except Exception as e:
@@ -331,8 +302,7 @@ def logout():
 @app.route("/api/usuario")
 def info_usuario():
     u = get_usuario_actual()
-    if not u:
-        return jsonify({"logueado": False})
+    if not u: return jsonify({"logueado": False})
     resetear_si_nuevo_dia(u)
     return jsonify({
         "logueado": True,
@@ -342,73 +312,49 @@ def info_usuario():
 
 @app.route("/<tarea>", methods=["POST"])
 def manejar_tarea(tarea):
-    if tarea not in TAREAS_VALIDAS:
-        return jsonify({"error": "Tarea inválida"}), 400
+    if tarea not in TAREAS_VALIDAS: return jsonify({"error": "Tarea inválida"}), 400
     u = get_usuario_actual()
-    if not u:
-        return jsonify({"error": "No autenticado"}), 401
+    if not u: return jsonify({"error": "No autenticado"}), 401
 
     data = request.get_json(silent=True) or {}
-
-    # Manejo de material base
     nuevo_material = data.get("material")
     if nuevo_material:
-        if len(nuevo_material) > MAX_MATERIAL:
-            return jsonify({"error": "Material muy largo"}), 400
+        if len(nuevo_material) > MAX_MATERIAL: return jsonify({"error": "Material muy largo"}), 400
         u.material = nuevo_material
         db.session.commit()
-        if tarea == "cargar_material":
-            return jsonify({"res": "Material guardado."})
+        if tarea == "cargar_material": return jsonify({"res": "Material guardado."})
 
     resetear_si_nuevo_dia(u)
     permitidas = consultas_permitidas(u)
-    if u.consultas_usadas >= permitidas:
-        return jsonify({"error": "Consultas agotadas."}), 403
+    if u.consultas_usadas >= permitidas: return jsonify({"error": "Consultas agotadas."}), 403
 
     texto = data.get("writing", data.get("texto", "")).strip()
     materia = data.get("materia", "general")
     consigna = data.get("prompt", "")
 
-    tareas_sin_texto = ["cargar_material", "generar_examen", "generar_rap", "generar_red"]
-    if not texto and tarea not in tareas_sin_texto:
-        return jsonify({"error": "Falta contenido."}), 400
-    if len(texto) > MAX_TEXTO:
-        return jsonify({"error": "Texto muy largo"}), 400
-
-    # IA se llama ANTES de descontar la consulta
+    # IA Call
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia, consigna)
-    if res is None:
-        return jsonify({"error": "Error de conexión con la IA. No se descontó tu consulta."}), 503
+    if res is None: return jsonify({"error": "Error de conexión con la IA."}), 503
 
-    # Tareas que devuelven JSON estructurado
     tareas_json = ["evaluar", "generar_examen", "generar_rap", "generar_red",
-                   "corregir_escrito", "corregir_resumen", "explicar_concepto"]
+                   "corregir_escrito", "corregir_resumen", "explicar_concepto", "evaluar_simulacro"]
     try:
         resultado = json.loads(res) if tarea in tareas_json else res
-    except (json.JSONDecodeError, TypeError):
-        resultado = res
+    except: resultado = res
 
-    # Solo se descuenta si la IA respondió correctamente
     u.consultas_usadas += 1
     u.ultima_consulta = datetime.datetime.now(datetime.timezone.utc)
     db.session.commit()
 
-    return jsonify({
-        "resultado": resultado,
-        "restantes": permitidas - u.consultas_usadas
-    })
+    return jsonify({"resultado": resultado, "restantes": permitidas - u.consultas_usadas})
 
-# --- RUTA: NOTIFICACIÓN DE EXAMEN ---
 @app.route("/configurar_examen", methods=["POST"])
 def configurar_examen():
     u = get_usuario_actual()
-    if not u:
-        return jsonify({"error": "No autenticado"}), 401
+    if not u: return jsonify({"error": "No autenticado"}), 401
     data = request.get_json()
     try:
-        msg = Message(f"Recordatorio de Examen: {data.get('materia')}",
-                      sender=app.config['MAIL_USERNAME'],
-                      recipients=[u.email])
+        msg = Message(f"Recordatorio de Examen: {data.get('materia')}", sender=app.config['MAIL_USERNAME'], recipients=[u.email])
         msg.body = f"Examen de {data.get('materia')}\nFecha: {data.get('fecha')}\n¡A estudiar!"
         mail.send(msg)
         return jsonify({"res": "Notificación enviada"})
@@ -416,23 +362,19 @@ def configurar_examen():
         logger.error("Error Mail: %s", e)
         return jsonify({"error": "Error al enviar correo"}), 500
 
-# --- RUTA: TIENDA ---
 @app.route("/tienda")
 def tienda():
-    mensaje = "Función en desarrollo. Estamos ajustando los packs."
-    return jsonify({"status": "proximamente", "mensaje": mensaje, "opciones": ["Pack Parcialito", "Pack Final"]})
+    return jsonify({"status": "proximamente", "mensaje": "En desarrollo."})
 
-# --- RUTA: VER ANUNCIO ---
 @app.route("/ver_anuncio", methods=["POST"])
 def ver_anuncio():
     u = get_usuario_actual()
-    if not u:
-        return jsonify({"error": "No autenticado"}), 401
-    if u.bloques_publicidad_vistos >= MAX_BLOQUES_PUBLICIDAD:
-        return jsonify({"error": "Límite diario de anuncios alcanzado. Volvé mañana."}), 403
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    if u.bloques_publicidad_vistos >= MAX_BLOQUES_PUBLICIDAD: return jsonify({"error": "Límite alcanzado."}), 403
     u.bloques_publicidad_vistos += 1
     db.session.commit()
     return jsonify({"res": "Anuncio registrado", "restantes": consultas_permitidas(u) - u.consultas_usadas})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    
