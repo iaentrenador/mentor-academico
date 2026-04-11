@@ -3,268 +3,450 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mentor IA - Beta 2.1 (V.A.L.F.)</title>
+    <title>Mentor IA - Entrenador Académico</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f0f2f5; padding: 10px; color: #333; }
-        .container { max-width: 900px; margin: 10px auto; background: #fff; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
-        .logo-container { text-align: center; margin-bottom: 15px; }
-        .logo-mentor { max-width: 100px; height: auto; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        h1 { text-align: center; color: #1a2a3a; margin: 10px 0 5px 0; font-size: 1.8em; }
-        .subtitle { text-align: center; color: #666; font-size: 0.95em; margin-bottom: 25px; font-weight: 400; }
-        .nav-links { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        .btn-nav { padding: 10px 18px; border-radius: 10px; font-weight: 600; text-decoration: none; font-size: 0.9em; transition: 0.2s; border: none; cursor: pointer; }
-        .btn-login { background: #4285f4; color: white; }
-        .btn-logout { background: #feebeb; color: #ea4335; }
-        .btn-tienda { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .status-badge { background: #e8f5e9; color: #2e7d32; padding: 8px 12px; border-radius: 8px; font-weight: bold; font-size: 0.9em; border: 1px solid #c8e6c9; }
-        .materia-selector { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 15px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        select { width: 100%; max-width: 300px; padding: 12px; border-radius: 10px; border: 2px solid #dee2e6; font-size: 1em; outline: none; transition: border-color 0.2s; }
-        .tip-box { background: #e7f3ff; color: #0c5460; padding: 15px; border-radius: 12px; font-size: 0.9em; margin-bottom: 15px; border-left: 6px solid #007bff; line-height: 1.4; }
-        textarea { width: 100%; height: 200px; padding: 15px; border: 2px solid #eee; border-radius: 15px; box-sizing: border-box; font-size: 16px; resize: vertical; margin-bottom: 10px; }
-        #consigna-container { display: none; margin-bottom: 10px; animation: fadeIn 0.3s; }
-        .input-consigna { width: 100%; padding: 12px; border: 2px dashed #3498db; border-radius: 10px; background: #f0f7ff; box-sizing: border-box; font-size: 1em; }
-        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 20px; }
-        button { padding: 14px; border: none; border-radius: 12px; cursor: pointer; background: #2c3e50; color: white; font-weight: 600; font-size: 0.95em; transition: all 0.3s ease; }
-        button:hover { background: #1a2a3a; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        .btn-load { background: #28a745; grid-column: 1 / -1; font-size: 1.1em; }
-        .btn-oratoria { background: #6f42c1; }
-        #resultado { margin-top: 25px; padding: 25px; background: #fafbfc; border-radius: 15px; border-left: 6px solid #2c3e50; min-height: 100px; font-size: 1.05em; line-height: 1.6; }
-        /* Estilo para Modo Abogacía */
-        #resultado.modo-legal { border-left-color: #003366; background: #f0f4f8; }
-        .nota-box { float: right; background: #2c3e50; color: white; padding: 10px 20px; border-radius: 10px; font-size: 1.5em; font-weight: bold; }
-        .seccion-eval { margin-bottom: 15px; }
-        .seccion-eval b { color: #1a2a3a; display: block; margin-bottom: 5px; text-transform: uppercase; font-size: 0.85em; }
-        .exam-form { margin-top: 35px; padding: 20px; border-radius: 15px; background: #fdfefe; border: 1px solid #e1e4e8; }
-        .exam-form h3 { margin-top: 0; color: #24292e; font-size: 1.2em; border-bottom: 2px solid #f1f1f1; padding-bottom: 10px; margin-bottom: 15px; }
-        .exam-inputs { display: flex; flex-direction: column; gap: 12px; }
-        .exam-inputs input { padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 1em; flex: 1; }
-        .btn-exam { background: #0366d6; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-        @media (min-width: 600px) { .exam-inputs { flex-direction: row; } }
+        .grade-red    { border-left: 8px solid #ef4444; background-color: #fef2f2; }
+        .grade-yellow { border-left: 8px solid #f59e0b; background-color: #fffbeb; }
+        .grade-green  { border-left: 8px solid #10b981; background-color: #f0fdf4; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade { animation: fadeIn 0.4s ease-out forwards; }
+
+        /* Toast */
+        #toast {
+            position: fixed; bottom: 1.5rem; right: 1.5rem;
+            padding: .75rem 1.25rem; border-radius: .75rem;
+            font-size: .875rem; font-weight: 600;
+            box-shadow: 0 4px 20px rgba(0,0,0,.15);
+            opacity: 0; pointer-events: none;
+            transition: opacity .3s ease;
+            z-index: 9999; max-width: 320px;
+        }
+        #toast.show { opacity: 1; pointer-events: auto; }
+        #toast.toast-error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+        #toast.toast-success { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+        #toast.toast-info    { background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; }
+
+        /* Auth banner */
+        #auth-banner {
+            display: none;
+            background: #eff6ff; border: 1px solid #93c5fd;
+            border-radius: .75rem; padding: 1rem 1.25rem;
+            color: #1e40af; font-size: .9rem;
+        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="logo-container">
-            <img src="https://lh3.googleusercontent.com/u/0/d/1KljzH443DnPqM5P1TDXjfXsrac4D-5Hz=w1000" alt="Logo Mentor IA" class="logo-mentor">
-        </div>
+<body class="bg-gray-100 text-gray-900 min-h-screen">
 
-        <h1>Mentor IA Académico</h1>
-        <div class="subtitle">Entrenador especializado - Proyecto V.A.L.F.</div>
+    <!-- Toast -->
+    <div id="toast" role="alert" aria-live="assertive"></div>
 
-        <div class="nav-links">
-            <a href="#" class="btn-nav btn-tienda" onclick="verTienda()">🛒 Tienda</a>
-            {% if usuario %}
-                <div class="status-badge">⚡ Consultas: <span id="contador-consultas">...</span></div>
-                <button id="btn-ad" class="btn-nav" style="background: #27ae60; color: white;" onclick="verPublicidad()">📺 +5 Consultas</button>
-                <a href="/logout" class="btn-nav btn-logout">🚪 Salir</a>
-            {% else %}
-                <a href="/login" class="btn-nav btn-login">🔑 Entrar</a>
-            {% endif %}
-        </div>
-
-        <div class="materia-selector">
-            <label for="materia">📚 <b>Elegir Materia de Estudio:</b></label>
-            <select id="materia">
-                <option value="general">General / Otras</option>
-                <option value="higiene">Higiene y Seguridad (Méndez)</option>
-                <option value="matematica">Matemática (Cálculo/Kenko)</option>
-                <option value="politica">Política y Sociedad (Oratoria)</option>
-                <option value="abogacia">Abogacía (UNLZ / Derecho Argentino)</option>
-            </select>
-        </div>
-
-        <div class="tip-box">
-            💡 <b>Tip V.A.L.F:</b> Para textos muy extensos, primero usa <b>Guardar Material</b>. Luego pide el resumen o explicación para mayor precisión.
-        </div>
-
-        <div id="consigna-container">
-            <input type="text" id="consigna" class="input-consigna" placeholder="📌 Pega aquí la consigna del docente (opcional)...">
-        </div>
-
-        <textarea id="texto" placeholder="Escribe aquí tu duda o tu respuesta para evaluar..."></textarea>
-
-        <div class="controls">
-            <button class="btn-load" onclick="enviar('cargar_material')">📌 Guardar Material de Contexto</button>
-            <button onclick="enviar('resumir')">Resumir</button>
-            <button onclick="enviar('explicar')">Explicar</button>
-            <button onclick="toggleEvaluar()">Evaluar</button>
-            <button class="btn-oratoria" onclick="enviar('preparar_oratoria')">🎙️ Preparar Oratoria</button>
-        </div>
-
-        <div id="resultado">El resultado aparecerá aquí...</div>
-
-        <div class="exam-form">
-            <h3>📅 Programar Alerta de Examen</h3>
-            <div class="exam-inputs">
-                <input type="text" id="exam-materia" placeholder="Materia (ej: Higiene I)">
-                <input type="date" id="exam-fecha">
-                <button class="btn-exam" onclick="programarExamen()">🔔 Avisarme al Mail</button>
+    <nav class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-brain text-2xl"></i>
+                <span class="font-bold text-lg tracking-tight">Mentor IA</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div id="token-badge" class="bg-indigo-800 px-3 py-1 rounded-full text-xs font-semibold hidden">
+                    <i class="fas fa-bolt mr-1"></i> <span id="consultas-val">--</span> consultas
+                </div>
+                {% if usuario %}
+                <span class="text-xs text-indigo-300 hidden sm:block">{{ usuario.email }}</span>
+                <a href="/logout" class="text-sm bg-indigo-600 hover:bg-indigo-500 px-3 py-1 rounded transition">Salir</a>
+                {% else %}
+                <a href="/login" class="text-sm bg-white text-indigo-700 px-3 py-1 rounded font-bold transition">Ingresar</a>
+                {% endif %}
             </div>
         </div>
-    </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto p-4 lg:p-8">
+
+        <!-- Banner: usuario no autenticado -->
+        <div id="auth-banner" class="mb-6">
+            <i class="fas fa-lock mr-2"></i>
+            <strong>Iniciá sesión</strong> para usar el Mentor IA.
+            <a href="/login" class="ml-2 underline font-bold hover:text-indigo-900">Ingresar con Google →</a>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- SIDEBAR -->
+            <aside class="lg:col-span-4 space-y-6">
+
+                <section class="bg-white rounded-2xl shadow-sm p-5 border border-gray-200">
+                    <h3 class="text-gray-700 font-bold mb-4 flex items-center">
+                        <i class="fas fa-cog mr-2 text-indigo-600"></i> Configuración
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="materia" class="block text-xs font-bold text-gray-500 uppercase mb-1">Materia / Modo</label>
+                            <select id="materia" class="w-full border border-gray-300 rounded-xl bg-gray-50 p-3 focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                                <option value="general">Normal (Contenidos)</option>
+                                <option value="alfabetizacion">Alfabetización Académica</option>
+                                <option value="higiene">Higiene y Seguridad</option>
+                                <option value="abogacia">Abogacía (UNLZ)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="tarea" class="block text-xs font-bold text-gray-500 uppercase mb-1">Tarea</label>
+                            <select id="tarea" class="w-full border border-gray-300 rounded-xl bg-gray-50 p-3 focus:ring-2 focus:ring-indigo-500 outline-none transition" onchange="onTareaChange()">
+                                <option value="evaluar">Evaluar Respuesta</option>
+                                <option value="generar_examen">Simulacro de Examen</option>
+                                <option value="resumir">Resumir</option>
+                                <option value="explicar">Explicar</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Perfil cognitivo -->
+                <section class="bg-white rounded-2xl shadow-sm p-5 border border-gray-200">
+                    <h3 class="text-gray-700 font-bold mb-3 flex items-center">
+                        <i class="fas fa-chart-line mr-2 text-indigo-600"></i> Perfil de Aprendizaje
+                    </h3>
+                    <div id="perfil-cog" class="space-y-2 text-sm text-gray-600">
+                        <p class="italic text-gray-400">Realizá tu primera evaluación para activar el análisis...</p>
+                    </div>
+                </section>
+
+                <!-- Ver anuncio -->
+                <button onclick="verAnuncio()" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:from-amber-600 hover:to-orange-700 transition active:scale-95">
+                    <i class="fas fa-play-circle mr-2"></i> Ver Anuncio (+5 Consultas)
+                </button>
+            </aside>
+
+            <!-- ÁREA PRINCIPAL -->
+            <article class="lg:col-span-8 space-y-6">
+
+                <!-- Material base -->
+                <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-200">
+                    <div class="bg-gray-50 px-5 py-3 border-b border-gray-200 flex justify-between items-center">
+                        <span class="text-sm font-bold text-gray-600">Material de Estudio</span>
+                        <button onclick="guardarMaterial()" class="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg font-bold hover:bg-indigo-200 transition">
+                            Guardar Base
+                        </button>
+                    </div>
+                    <textarea id="material" rows="3"
+                        class="w-full p-5 text-sm focus:outline-none placeholder-gray-400 resize-none"
+                        placeholder="Pegá aquí el texto que el Mentor debe conocer..."></textarea>
+                </div>
+
+                <!-- Zona de trabajo -->
+                <div class="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-200 flex flex-col min-h-[400px]">
+                    <div class="bg-gray-50 px-5 py-3 border-b border-gray-200">
+                        <span id="label-produccion" class="text-sm font-bold text-gray-600">Tu Producción / Consigna</span>
+                    </div>
+                    <textarea id="texto"
+                        class="flex-grow w-full p-5 focus:outline-none text-lg leading-relaxed resize-none"
+                        placeholder="Escribí tu respuesta o presioná 'Ejecutar' para generar el examen..."></textarea>
+                    <div class="p-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
+                        <button id="btn-main" onclick="procesar()"
+                            class="flex-grow bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-indigo-200 shadow-lg hover:bg-indigo-700 transition flex items-center justify-center">
+                            <i class="fas fa-rocket mr-2"></i> Ejecutar Entrenamiento
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Resultado -->
+                <div id="resultado-box" class="hidden animate-fade"></div>
+
+            </article>
+        </div>
+    </main>
 
     <script>
-        window.onload = async () => {
-            try {
-                const res = await fetch('/api/usuario');
-                const data = await res.json();
-                if (data.logueado) {
-                    const contador = document.getElementById('contador-consultas');
-                    if (contador) contador.innerText = data.restantes;
-                }
-            } catch (err) {
-                console.log("Sesión no iniciada.");
-            }
-        };
+    // ─── UTILIDADES ──────────────────────────────────────────────────────────────
 
-        function toggleEvaluar() {
-            const cont = document.getElementById('consigna-container');
-            if (cont.style.display === 'block') {
-                enviar('evaluar');
-            } else {
-                cont.style.display = 'block';
-                document.getElementById('resultado').innerText = "💡 Se habilitó el campo de CONSIGNA. Completalo para una mejor evaluación.";
-            }
+    // FIX: sanitizador XSS — nunca insertar strings sin pasar por acá
+    function esc(str) {
+        if (str == null) return '';
+        const d = document.createElement('div');
+        d.textContent = String(str);
+        return d.innerHTML;
+    }
+
+    // FIX: reemplazar todos los alert() por toasts no bloqueantes
+    let _toastTimer;
+    function toast(msg, type = 'info') {
+        const t = document.getElementById('toast');
+        clearTimeout(_toastTimer);
+        t.textContent = msg;
+        t.className = `show toast-${type}`;
+        _toastTimer = setTimeout(() => { t.className = ''; }, 4000);
+    }
+
+    // FIX: fetch wrapper con manejo de response.ok y JSON seguro
+    async function apiFetch(url, opts = {}) {
+        const resp = await fetch(url, {
+            headers: { 'Content-Type': 'application/json' },
+            ...opts,
+        });
+        let data;
+        try { data = await resp.json(); }
+        catch { data = { error: `Error del servidor (${resp.status})` }; }
+        if (!resp.ok && !data.error) data.error = `Error ${resp.status}`;
+        return data;
+    }
+
+    // ─── ESTADO LOCAL ────────────────────────────────────────────────────────────
+    // FIX: el material se envía una sola vez al guardar y luego no viaja en cada request
+    let materialGuardado = false;
+    // Examen activo para poder enviarlo a corregir
+    let examenActivo = null;
+
+    // ─── INIT ────────────────────────────────────────────────────────────────────
+    // FIX: DOMContentLoaded en lugar de window.onload
+    document.addEventListener('DOMContentLoaded', actualizarUI);
+
+    function onTareaChange() {
+        const tarea = document.getElementById('tarea').value;
+        const label = document.getElementById('label-produccion');
+        const textoArea = document.getElementById('texto');
+        if (tarea === 'generar_examen') {
+            label.textContent = 'Consigna opcional (dejar vacío para automático)';
+            textoArea.placeholder = 'Podés agregar una consigna específica o dejarlo vacío...';
+        } else if (tarea === 'evaluar') {
+            label.textContent = 'Tu Producción';
+            textoArea.placeholder = 'Escribí tu respuesta para que el Mentor la evalúe...';
+        } else {
+            label.textContent = 'Tu Consulta';
+            textoArea.placeholder = 'Escribí tu pregunta o el texto a procesar...';
+        }
+    }
+
+    // ─── ACCIÓN PRINCIPAL ────────────────────────────────────────────────────────
+    async function procesar() {
+        const tarea   = document.getElementById('tarea').value;
+        const materia = document.getElementById('materia').value;
+        const texto   = document.getElementById('texto').value.trim();
+        const btn     = document.getElementById('btn-main');
+
+        // FIX: mostrar banner de login en lugar de alert genérico
+        const estadoUsuario = await apiFetch('/api/usuario');
+        if (!estadoUsuario.logueado) {
+            document.getElementById('auth-banner').style.display = 'block';
+            document.getElementById('auth-banner').scrollIntoView({ behavior: 'smooth' });
+            return;
         }
 
-        async function enviar(tarea) {
-            const texto = document.getElementById('texto').value;
-            const consigna = document.getElementById('consigna').value;
+        if (tarea !== 'generar_examen' && !texto) {
+            toast('Escribí tu respuesta antes de ejecutar.', 'error');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Analizando...';
+
+        try {
+            // FIX: ya no enviamos `material` en cada request — solo texto+materia
+            const data = await apiFetch(`/api/${tarea}`, {
+                method: 'POST',
+                body: JSON.stringify({ texto, materia }),
+            });
+
+            if (data.error) {
+                toast(data.error, 'error');
+            } else {
+                renderizarResultado(tarea, data.resultado);
+                actualizarUI();
+            }
+        } catch (e) {
+            console.error(e);
+            toast('Error de conexión con el servidor.', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-rocket mr-2"></i> Ejecutar Entrenamiento';
+        }
+    }
+
+    // ─── RENDER ──────────────────────────────────────────────────────────────────
+    function renderizarResultado(tarea, res) {
+        const box = document.getElementById('resultado-box');
+        box.classList.remove('hidden');
+        box.innerHTML = '';
+        examenActivo = null;
+
+        if (tarea === 'evaluar') {
+            // FIX: todo el contenido dinámico pasa por esc()
+            const colorClass = res.grade >= 7 ? 'grade-green' : (res.grade >= 4 ? 'grade-yellow' : 'grade-red');
+            const promoBadge = res.isPromoted
+                ? '<span class="bg-green-500 text-white text-xs px-2 py-1 rounded-full font-bold">PROMOCIÓN</span>'
+                : '<span class="bg-gray-400 text-white text-xs px-2 py-1 rounded-full font-bold">FINAL</span>';
+
+            const mainFeedback = esc(res.sections?.mainIdeas?.feedback ?? '—');
+            const cohFeedback  = esc(res.sections?.cohesion_coherence?.feedback ?? '—');
+            const rigorFeedback = esc(res.sections?.academic_rigor?.feedback ?? '—');
+
+            box.innerHTML = `
+                <div class="p-6 rounded-2xl shadow-lg ${colorClass} mb-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h2 class="text-3xl font-black text-gray-800">Nota: ${esc(String(res.grade))}</h2>
+                            <span class="text-sm font-bold uppercase tracking-widest text-gray-500">${esc(res.status)}</span>
+                        </div>
+                        <div class="text-right">${promoBadge}</div>
+                    </div>
+                    <p class="text-gray-700 leading-relaxed mb-4"><strong>Análisis:</strong> ${esc(res.performanceAnalysis)}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mt-4">
+                        <div class="bg-white/50 p-3 rounded-lg border border-black/5">
+                            <h4 class="font-bold text-indigo-700 uppercase text-xs mb-1">Ideas principales</h4>
+                            <p>${mainFeedback}</p>
+                        </div>
+                        <div class="bg-white/50 p-3 rounded-lg border border-black/5">
+                            <h4 class="font-bold text-orange-700 uppercase text-xs mb-1">Cohesión y coherencia</h4>
+                            <p>${cohFeedback}</p>
+                        </div>
+                        <div class="bg-white/50 p-3 rounded-lg border border-black/5">
+                            <h4 class="font-bold text-rose-700 uppercase text-xs mb-1">Rigor académico</h4>
+                            <p>${rigorFeedback}</p>
+                        </div>
+                    </div>
+                    <div class="mt-6 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                        <h4 class="font-bold text-indigo-800 mb-2">Versión Académica Sugerida:</h4>
+                        <p class="text-sm italic text-gray-600">${esc(res.improvedVersion)}</p>
+                    </div>
+                </div>`;
+
+        } else if (tarea === 'generar_examen') {
+            // FIX: examen conectado a evaluación — guardamos estado y agregamos botón corregir
+            examenActivo = res.examen;
             const materia = document.getElementById('materia').value;
-            const resDiv = document.getElementById('resultado');
-            const contador = document.getElementById('contador-consultas');
 
-            if (tarea === 'cargar_material' && !texto) return alert("Pegá el material antes de guardarlo.");
-            if (tarea !== 'cargar_material' && !texto) return alert("Ingresa contenido primero.");
+            let html = `<div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
+                <h3 class="font-bold mb-5 text-indigo-700 text-lg">
+                    <i class="fas fa-file-alt mr-2"></i>Simulacro de Examen
+                </h3>`;
 
-            // Feedback visual según la materia
-            if (materia === 'abogacia') {
-                resDiv.classList.add('modo-legal');
-                resDiv.innerHTML = "<i>⚖️ Analizando marco legal argentino...</i>";
+            res.examen.forEach(q => {
+                // FIX: esc() en pregunta y opciones
+                html += `<div class="mb-6 p-4 bg-gray-50 rounded-xl" data-qid="${q.id}">
+                    <p class="font-bold text-gray-800 mb-3">${esc(String(q.id))}. ${esc(q.pregunta)}</p>`;
+
+                if (q.tipo === 'choice' && Array.isArray(q.opciones)) {
+                    q.opciones.forEach((o, i) => {
+                        html += `<label class="flex items-center gap-2 p-2 text-sm border border-gray-200 rounded-lg mb-2 hover:bg-white cursor-pointer">
+                            <input type="radio" name="q${q.id}" value="${esc(o)}" class="shrink-0"> ${esc(o)}
+                        </label>`;
+                    });
+                } else {
+                    html += `<textarea class="w-full p-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        rows="3" placeholder="Escribí tu respuesta..." id="resp-${q.id}"></textarea>`;
+                }
+                html += `</div>`;
+            });
+
+            // FIX: botón para corregir el examen completo
+            html += `<button onclick="corregirExamen('${materia}')"
+                class="w-full mt-2 bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                <i class="fas fa-check-circle"></i> Corregir Examen
+            </button></div>`;
+
+            box.innerHTML = html;
+
+        } else {
+            // Resumir / Explicar — texto plano
+            const contenido = typeof res === 'string' ? esc(res) : esc(JSON.stringify(res, null, 2));
+            box.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 text-gray-700 leading-relaxed whitespace-pre-wrap">${contenido}</div>`;
+        }
+
+        box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // FIX: nueva función para corregir el examen generado
+    async function corregirExamen(materia) {
+        if (!examenActivo) return;
+
+        // Recolectar respuestas del alumno
+        const respuestas = examenActivo.map(q => {
+            let respAlumno = '';
+            if (q.tipo === 'choice') {
+                const sel = document.querySelector(`input[name="q${q.id}"]:checked`);
+                respAlumno = sel ? sel.value : '(sin respuesta)';
             } else {
-                resDiv.classList.remove('modo-legal');
-                resDiv.innerHTML = "<i>Pensando como experto...</i>";
+                const ta = document.getElementById(`resp-${q.id}`);
+                respAlumno = ta ? ta.value.trim() : '(sin respuesta)';
             }
+            return `Pregunta ${q.id}: ${q.pregunta}\nRespuesta alumno: ${respAlumno}\nRespuesta correcta: ${q.respuesta_correcta}`;
+        }).join('\n\n');
 
-            try {
-                const payload = tarea === 'cargar_material'
-                    ? { material: texto }
-                    : { texto: texto, writing: texto, prompt: consigna, materia: materia };
+        const btn = document.querySelector('[onclick^="corregirExamen"]');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Corrigiendo...'; }
 
-                const response = await fetch(`/${tarea}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await response.json();
+        const data = await apiFetch('/api/evaluar', {
+            method: 'POST',
+            body: JSON.stringify({ texto: respuestas, materia }),
+        });
 
-                if (data.error) {
-                    resDiv.innerText = "❌ " + data.error;
-                } else {
-                    if (data.restantes !== undefined && contador) contador.innerText = data.restantes;
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Corregir Examen'; }
 
-                    const resIA = data.resultado || data.res;
+        if (data.error) {
+            toast(data.error, 'error');
+        } else {
+            renderizarResultado('evaluar', data.resultado);
+            actualizarUI();
+        }
+    }
 
-                    if (tarea === 'cargar_material') {
-                        document.getElementById('consigna-container').style.display = 'block';
-                        document.getElementById('texto').value = "";
-                        document.getElementById('texto').placeholder = "Ahora escribe tu RESPUESTA para que el Mentor la evalúe...";
-                        resDiv.innerHTML = "✅ <b>Material guardado.</b><br>Se habilitaron los campos de <b>Consigna</b> y <b>Respuesta</b>. Completalos y pulsa 'Evaluar'.";
-                        document.getElementById('consigna').focus();
-                    } else if (typeof resIA === 'object' && resIA !== null) {
-                        resDiv.innerHTML = `
-                            <div class="nota-box">${resIA.nota || 'S/N'}</div>
-                            <div class="seccion-eval"><b>✅ Fortalezas:</b> ${resIA.fortalezas || ''}</div>
-                            <div class="seccion-eval"><b>⚠️ Debilidades:</b> ${resIA.debilidades || ''}</div>
-                            <div class="seccion-eval"><b>💡 Sugerencia:</b> ${resIA.sugerencia || ''}</div>
-                        `;
-                    } else {
-                        resDiv.innerText = resIA || "Operación completada.";
-                    }
-                }
-            } catch (err) {
-                resDiv.innerText = "⚠️ Error de conexión con el servidor.";
+    // ─── HELPERS DE UI ───────────────────────────────────────────────────────────
+    async function actualizarUI() {
+        const data = await apiFetch('/api/usuario');
+        const badge = document.getElementById('token-badge');
+        const banner = document.getElementById('auth-banner');
+
+        if (data.logueado) {
+            document.getElementById('consultas-val').textContent = data.restantes;
+            badge.classList.remove('hidden');
+            banner.style.display = 'none';
+
+            // FIX: mostrar perfil cognitivo si existe
+            if (data.perfil && Object.keys(data.perfil).length > 0) {
+                const perfilDiv = document.getElementById('perfil-cog');
+                perfilDiv.innerHTML = Object.entries(data.perfil).map(([k, v]) =>
+                    `<div class="p-2 bg-orange-50 border border-orange-100 rounded-lg">
+                        <span class="font-bold text-orange-700 text-xs uppercase">${esc(k)}</span>
+                        <p class="text-gray-600 text-xs mt-1">${esc(v)}</p>
+                    </div>`
+                ).join('');
             }
+        } else {
+            badge.classList.add('hidden');
+            banner.style.display = 'block';
         }
+    }
 
-        async function verPublicidad() {
-            const btnAd = document.getElementById('btn-ad');
-            const resDiv = document.getElementById('resultado');
+    async function guardarMaterial() {
+        const material = document.getElementById('material').value.trim();
+        if (!material) { toast('El campo de material está vacío.', 'error'); return; }
 
-            if (!confirm("¿Deseas ver un anuncio para obtener 5 consultas extra?")) return;
+        const data = await apiFetch('/api/cargar_material', {
+            method: 'POST',
+            body: JSON.stringify({ material }),
+        });
 
-            window.open('https://www.profitablecpmratenetwork.com/n2r78m21y?key=53d8cbd50aefa22ac6dd367853c1809e', '_blank');
-
-            btnAd.disabled = true;
-            btnAd.style.opacity = "0.5";
-            let segundos = 15;
-
-            resDiv.innerHTML = `⏳ Validando visualización... Aguardá <b><span id="timer">${segundos}</span> segundos</b> para recibir tus consultas. No cierres la app.`;
-
-            const intervalo = setInterval(() => {
-                segundos--;
-                const timerEl = document.getElementById('timer');
-                if (timerEl) timerEl.innerText = segundos;
-                if (segundos <= 0) {
-                    clearInterval(intervalo);
-                    registrarAnuncio();
-                }
-            }, 1000);
+        if (data.error) {
+            toast(data.error, 'error');
+        } else {
+            materialGuardado = true;
+            toast('Material guardado correctamente.', 'success');
         }
+    }
 
-        async function registrarAnuncio() {
-            const resDiv = document.getElementById('resultado');
-            const btnAd = document.getElementById('btn-ad');
-            resDiv.innerText = "Registrando tus beneficios...";
-            try {
-                const response = await fetch('/ver_anuncio', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await response.json();
-                if (data.res) {
-                    const contador = document.getElementById('contador-consultas');
-                    if (contador) contador.innerText = data.restantes;
-                    resDiv.innerText = "✅ ¡5 consultas agregadas correctamente!";
-                } else {
-                    resDiv.innerText = "❌ " + (data.error || "Error al registrar.");
-                }
-            } catch (err) {
-                resDiv.innerText = "⚠️ Error al conectar con el servidor.";
-            } finally {
-                btnAd.disabled = false;
-                btnAd.style.opacity = "1";
-            }
+    async function verAnuncio() {
+        const data = await apiFetch('/api/ver_anuncio', { method: 'POST' });
+        if (data.error) {
+            toast(data.error, 'error');
+        } else {
+            toast('¡+5 consultas desbloqueadas!', 'success');
+            actualizarUI();
         }
-
-        async function programarExamen() {
-            const materia = document.getElementById('exam-materia').value;
-            const fecha = document.getElementById('exam-fecha').value;
-            if (!materia || !fecha) return alert("Completa materia y fecha.");
-            try {
-                const response = await fetch('/configurar_examen', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ materia, fecha })
-                });
-                const data = await response.json();
-                alert(data.res || data.error);
-            } catch (err) {
-                alert("Error al programar alerta.");
-            }
-        }
-
-        async function verTienda() {
-            try {
-                const response = await fetch('/tienda');
-                const data = await response.json();
-                alert(`🏪 TIENDA MENTOR\n\n${data.mensaje}\n\nOpciones próximas:\n- ${data.opciones.join('\n- ')}`);
-            } catch (err) {
-                alert("La tienda no está disponible.");
-            }
-        }
+    }
     </script>
 </body>
-        </html>
-    
+</html>
