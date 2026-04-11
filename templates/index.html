@@ -33,15 +33,14 @@
         .btn-concepto { background: #16a085; }
         .btn-resumen { background: #8e44ad; }
 
-        /* --- NUEVOS ESTILOS SIMULACRO --- */
+        /* --- ESTILOS SIMULACRO --- */
         .exam-container { background: #fff; border-radius: 15px; border: 1px solid #ddd; animation: fadeIn 0.4s; }
         .progress-container { width: 100%; height: 10px; background: #eee; border-radius: 5px; margin-bottom: 20px; overflow: hidden; }
         .progress-bar { height: 100%; background: #3498db; width: 0%; transition: width 0.3s; }
-        .option-btn { display: block; width: 100%; text-align: left; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; cursor: pointer; background: #f9f9f9; transition: 0.2s; }
-        .option-btn:hover { background: #e7f3ff; border-color: #3498db; }
+        .option-btn { display: block; width: 100%; text-align: left; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; cursor: pointer; background: #f9f9f9; transition: 0.2s; color: #333; font-size: 0.95em; }
+        .option-btn:hover { background: #e7f3ff; border-color: #3498db; transform: none; box-shadow: none; }
         .option-btn.selected { background: #d5f5e3; border-color: #27ae60; border-width: 2px; }
         .nav-buttons { display: flex; justify-content: space-between; margin-top: 20px; gap: 10px; }
-        /* ------------------------------- */
 
         #resultado { margin-top: 25px; padding: 25px; background: #fafbfc; border-radius: 15px; border-left: 6px solid #2c3e50; min-height: 100px; font-size: 1.05em; line-height: 1.6; }
         #network-container { width: 100%; height: 500px; border: 1px solid #ddd; border-radius: 15px; background-color: #ffffff; margin-top: 15px; display: none; }
@@ -72,8 +71,9 @@
 </head>
 <body>
     <div class="container">
+        <!-- FIX: URL del logo restaurada a la que funciona en producción -->
         <div class="logo-container">
-            <img src="https://drive.google.com/uc?export=view&id=1KljzH443DnPqM5P1TDXjfXsrac4D-5Hz" alt="Logo Mentor IA" class="logo-mentor">
+            <img src="https://lh3.googleusercontent.com/u/0/d/1KljzH443DnPqM5P1TDXjfXsrac4D-5Hz=w1000" alt="Logo Mentor IA" class="logo-mentor">
         </div>
 
         <h1>Mentor IA Académico</h1>
@@ -103,7 +103,7 @@
         </div>
 
         <div class="tip-box">
-            💡 <b>Tip V.A.L:</b> Primero usá <b>Guardar Material</b> para cargar el texto base. Luego podés Resumir, Explicar, Evaluar, Corregir escritos o pedir un <b>Simulacro de Examen</b>.
+            💡 <b>Tip V.A.L.F:</b> Primero usá <b>Guardar Material</b> para cargar el texto base. Luego podés Resumir, Explicar, Evaluar, Corregir escritos o pedir un <b>Simulacro de Examen</b>.
         </div>
 
         <div id="consigna-container">
@@ -120,7 +120,8 @@
             <button class="btn-corregir" onclick="toggleCorregirEscrito()">✏️ Corregir Escrito</button>
             <button class="btn-resumen" onclick="enviar('corregir_resumen')">📋 Corregir Resumen</button>
             <button class="btn-concepto" onclick="enviar('explicar_concepto')">🔍 Explicar Concepto</button>
-            <button style="background:#0366d6;" onclick="enviar('generar_examen')">📝 Simulacro Examen</button>
+            <!-- FIX: Simulacro usa función dedicada que valida material antes de llamar -->
+            <button style="background:#0366d6;" onclick="generarSimulacro()">📝 Simulacro Examen</button>
             <button class="btn-oratoria" onclick="enviar('preparar_oratoria')">🎙️ Oratoria</button>
             <button style="background:#e74c3c;" onclick="enviar('generar_rap')">🎵 Rap Técnico</button>
             <button style="background:#2980b9;" onclick="enviar('generar_red')">🕸️ Red Conceptual</button>
@@ -158,7 +159,7 @@
 
         function toggleEvaluar() {
             const cont = document.getElementById('consigna-container');
-            if (cont.style.display === 'block') { enviar('evaluar'); } 
+            if (cont.style.display === 'block') { enviar('evaluar'); }
             else {
                 cont.style.display = 'block';
                 document.getElementById('resultado').innerText = "💡 Se habilitó el campo de CONSIGNA. Completalo y volvé a presionar Evaluar.";
@@ -167,11 +168,17 @@
 
         function toggleCorregirEscrito() {
             const cont = document.getElementById('consigna-container');
-            if (cont.style.display === 'block') { enviar('corregir_escrito'); } 
+            if (cont.style.display === 'block') { enviar('corregir_escrito'); }
             else {
                 cont.style.display = 'block';
                 document.getElementById('resultado').innerText = "✏️ Se habilitó el campo de CONSIGNA. Pegá la consigna y tu escrito. Volvé a presionar Corregir Escrito.";
             }
+        }
+
+        // FIX: Función dedicada para el simulacro con aviso claro al usuario
+        function generarSimulacro() {
+            document.getElementById('resultado').innerHTML = "<i>⏳ Generando simulacro basado en tu material cargado...</i>";
+            enviar('generar_examen');
         }
 
         async function enviar(tarea) {
@@ -190,7 +197,10 @@
             netCont.style.display = 'none';
 
             try {
-                const payload = tarea === 'cargar_material' ? { material: texto } : { texto, writing: texto, prompt: consigna, materia };
+                const payload = tarea === 'cargar_material'
+                    ? { material: texto }
+                    : { texto, writing: texto, prompt: consigna, materia };
+
                 const response = await fetch(`/${tarea}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -205,32 +215,42 @@
                 if (tarea === 'cargar_material') {
                     document.getElementById('consigna-container').style.display = 'block';
                     document.getElementById('texto').value = "";
-                    resDiv.innerHTML = "✅ <b>Material guardado.</b>";
-                } 
-                else if (tarea === 'generar_examen') {
+                    resDiv.innerHTML = "✅ <b>Material guardado.</b> Ahora podés usar Simulacro, Evaluar, Corregir Escrito o cualquier otra función.";
+
+                } else if (tarea === 'generar_examen') {
+                    // FIX: validación antes de iniciar el simulacro
                     iniciarSimulacro(resIA);
-                }
-                else if (tarea === 'generar_red' && typeof resIA === 'object' && resIA.nodes) {
+
+                } else if (tarea === 'generar_red' && typeof resIA === 'object' && resIA.nodes) {
                     resDiv.innerHTML = `<b>🕸️ Red Conceptual: ${resIA.title}</b><p>${resIA.summary}</p>`;
                     netCont.style.display = 'block';
                     const nodes = new vis.DataSet(resIA.nodes.map(n => ({
                         id: n.id, label: n.label, shape: 'box', margin: 10,
-                        color: n.type==='core'?'#e74c3c':(n.type==='main'?'#3498db':'#2ecc71'),
-                        font: {color:'white', face:'Tahoma'}
+                        color: n.type === 'core' ? '#e74c3c' : (n.type === 'main' ? '#3498db' : '#2ecc71'),
+                        font: { color: 'white', face: 'Tahoma' }
                     })));
                     const edges = new vis.DataSet(resIA.edges.map(e => ({ from: e.from, to: e.to, label: e.label, arrows: 'to' })));
-                    new vis.Network(netCont, {nodes, edges}, {physics:{enabled:true}});
-                } 
-                else if (typeof resIA === 'object' && resIA !== null && resIA.grade !== undefined) {
+                    new vis.Network(netCont, { nodes, edges }, { physics: { enabled: true } });
+
+                } else if (typeof resIA === 'object' && resIA !== null && resIA.grade !== undefined) {
                     renderizarFeedbackAcademico(resIA);
+
                 } else {
                     resDiv.innerText = resIA || "Operación completada.";
                 }
-            } catch (err) { resDiv.innerText = "⚠️ Error de conexión."; }
+            } catch (err) {
+                resDiv.innerText = "⚠️ Error de conexión con el servidor.";
+            }
         }
 
-        /* LÓGICA DE MÁQUINA DE ESTADOS PARA EXAMEN */
+        /* LÓGICA DEL SIMULACRO */
+
+        // FIX: validación de datos antes de iniciar — evita crash silencioso
         function iniciarSimulacro(datos) {
+            if (!datos || !datos.questions || datos.questions.length === 0) {
+                document.getElementById('resultado').innerHTML = "❌ No se pudo generar el examen. Asegurate de haber cargado el material primero con <b>Guardar Material</b>.";
+                return;
+            }
             examenActual = datos;
             respuestasUsuario = new Array(datos.questions.length).fill(null);
             pasoActual = 0;
@@ -256,10 +276,10 @@
                         `).join('')}
                     </div>
                     <div class="nav-buttons">
-                        <button onclick="navegarExamen(-1)" ${pasoActual === 0 ? 'disabled' : ''}>Anterior</button>
-                        ${pasoActual === total - 1 
-                            ? `<button style="background:#27ae60;" onclick="finalizarSimulacro()">Finalizar Examen</button>` 
-                            : `<button onclick="navegarExamen(1)">Siguiente</button>`}
+                        <button onclick="navegarExamen(-1)" ${pasoActual === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>← Anterior</button>
+                        ${pasoActual === total - 1
+                            ? `<button style="background:#27ae60;" onclick="finalizarSimulacro()">✅ Finalizar Examen</button>`
+                            : `<button onclick="navegarExamen(1)">Siguiente →</button>`}
                     </div>
                 </div>
             `;
@@ -271,44 +291,38 @@
         async function finalizarSimulacro() {
             const resDiv = document.getElementById('resultado');
             resDiv.innerHTML = "<i>⏳ Profesor IA corrigiendo tu examen...</i>";
-            
+
             const reporte = examenActual.questions.map((q, i) => ({
                 pregunta: q.question,
                 respuesta_usuario: q.answerOptions[respuestasUsuario[i]] || "No respondida",
                 correcta: q.answerOptions[q.correctAnswerIndex],
-                es_valida: respuestasUsuario[i] === q.correctAnswerIndex
+                es_correcta: respuestasUsuario[i] === q.correctAnswerIndex
             }));
 
             try {
                 const response = await fetch('/evaluar_simulacro', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ texto: JSON.stringify(reporte), materia: document.getElementById('materia').value })
+                    body: JSON.stringify({
+                        texto: JSON.stringify(reporte),
+                        materia: document.getElementById('materia').value
+                    })
                 });
                 const data = await response.json();
+
+                // FIX: validación antes de renderizar
+                if (!data.resultado) {
+                    resDiv.innerText = "❌ Error al procesar la corrección del examen.";
+                    return;
+                }
                 renderizarFeedbackAcademico(data.resultado);
-            } catch (err) { resDiv.innerText = "Error al corregir."; }
+            } catch (err) {
+                resDiv.innerText = "⚠️ Error al conectar con el servidor para corregir.";
+            }
         }
 
         function renderizarFeedbackAcademico(resIA) {
             const resDiv = document.getElementById('resultado');
             const nota = resIA.grade ?? 'S/N';
             const status = resIA.status || '';
-            const badgeClass = status.toLowerCase().includes('excel') ? 'badge-excelente' : status.toLowerCase().includes('satisf') ? 'badge-satisfactorio' : 'badge-insuficiente';
-            
-            const renderLista = (arr) => arr?.length ? `<ul class="lista-eval">${arr.map(i => `<li>${i}</li>`).join('')}</ul>` : '—';
-            const renderSecciones = (s) => s ? Object.entries(s).map(([k,v]) => `<div class="score-bar"><span>${k}</span><div class="score-track"><div class="score-fill" style="width:${(v.score||0)*10}%"></div></div><span>${v.score||0}/10</span></div>`).join('') : '';
-
-            resDiv.innerHTML = `
-                <div class="nota-box">${nota}/10</div>
-                <span class="badge-status ${badgeClass}">${status}</span>
-                <div style="clear:both"></div>
-                <div class="seccion-eval"><b>📊 Análisis de Desempeño</b><p>${resIA.performanceAnalysis || ''}</p></div>
-                ${resIA.sections ? `<div class="seccion-eval"><b>📈 Puntajes por Área</b>${renderSecciones(resIA.sections)}</div>` : ''}
-                <div class="seccion-eval"><b>✅ Fortalezas</b>${renderLista(resIA.strengths)}</div>
-                <div class="seccion-eval"><b>⚠️ Aspectos a Mejorar</b>${renderLista(resIA.weaknesses)}</div>
-                <div class="seccion-eval" style="background:#e7f3ff;"><b>💡 Sugerencias</b>${renderLista(resIA.improvementSuggestions)}</div>
-            `;
-        }
-
-        async fu
+            const badgeClass
