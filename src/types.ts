@@ -1,40 +1,57 @@
-export enum AppState {
-  WELCOME = 'WELCOME',
-  TEXT_SELECTION = 'TEXT_SELECTION',
-  READING = 'READING',
-  EXERCISE_INPUT = 'EXERCISE_INPUT',
-  RESULTS = 'RESULTS',
-  WRITING_CORRECTION_INPUT = 'WRITING_CORRECTION_INPUT',
-  WRITING_CORRECTION_RESULTS = 'WRITING_CORRECTION_RESULTS',
-  PDF_UPLOAD = 'PDF_UPLOAD',
-  PDF_CHAPTER_SELECTION = 'PDF_CHAPTER_SELECTION',
-  PDF_ACTION_SELECTION = 'PDF_ACTION_SELECTION',
-  PDF_EXERCISE_INPUT = 'PDF_EXERCISE_INPUT',
-  PDF_RESULTS = 'PDF_RESULTS',
-  TECHNICAL_RAP_INPUT = 'TECHNICAL_RAP_INPUT',
-  TECHNICAL_RAP_RESULTS = 'TECHNICAL_RAP_RESULTS',
-  CONCEPTUAL_NETWORK_INPUT = 'CONCEPTUAL_NETWORK_INPUT',
-  CONCEPTUAL_NETWORK_RESULTS = 'CONCEPTUAL_NETWORK_RESULTS',
-  SUMMARY_TOOL_SELECTION = 'SUMMARY_TOOL_SELECTION',
-  SUMMARY_GENERATION_INPUT = 'SUMMARY_GENERATION_INPUT',
-  SUMMARY_GENERATION_RESULTS = 'SUMMARY_GENERATION_RESULTS',
-  SUMMARY_CORRECTION_INPUT = 'SUMMARY_CORRECTION_INPUT',
-  SUMMARY_CORRECTION_RESULTS = 'SUMMARY_CORRECTION_RESULTS',
-  CONCEPT_EXPLAINER_INPUT = 'CONCEPT_EXPLAINER_INPUT',
-  CONCEPT_EXPLAINER_RESULTS = 'CONCEPT_EXPLAINER_RESULTS',
-  HISTORY = 'HISTORY',
-  COGNITIVE_MAP = 'COGNITIVE_MAP'
+// src/types.ts
+
+export interface StudentAnswers {
+  mainIdeas: string;
+  summary: string;
+  schema: string;
+  inferences: { a: string; b: string; c: string };
+  vocabulary: string;
+  opinion: string;
 }
 
-// Interfaces básicas para que React no tire error al compilar
-export interface UniversityText {
+export interface FullEvaluation {
+  grade: number;
+  performanceAnalysis: string;
+  strengths: string[];
+  weaknesses: string[];
+  improvementSuggestions: string[];
+  suggestedRetry: string;
+  sections: Record<string, any>;
+  finalGrade?: number;
+}
+
+export interface HistoryEntry {
+  id: string;
+  date: string;
   title: string;
-  content: string;
-  source?: string;
+  type: string;
+  grade?: number;
 }
 
-export interface WritingCorrectionInput {
-  writing: string;
-  materia: string;
-  prompt?: string;
+export interface CognitiveMapData {
+  concepts: string[];
+  connections: { from: string; to: string; label: string }[];
+  areas: string[];
+}
+
+export interface WritingCorrectionResult {
+  grade: number;
+  status: string;
+  performanceAnalysis: string;
+  strengths: string[];
+  weaknesses: string[];
+  improvedVersion: string;
+}
+
+export interface TechnicalRapResult {
+  title: string;
+  verses: string[];
+  evaluation: any;
+}
+
+export interface SummaryCorrectionResult {
+  grade: number;
+  performanceAnalysis: string;
+  omissions: string[];
+  improvedVersion: string;
 }
