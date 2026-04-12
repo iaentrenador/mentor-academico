@@ -3,7 +3,8 @@ import logging
 import datetime
 import json
 from groq import Groq
-from flask import Flask, request, jsonify, session, redirect, url_for, render_template
+# Agregamos 'send_from_directory' para servir React
+from flask import Flask, request, jsonify, session, redirect, url_for, render_template, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from authlib.integrations.flask_client import OAuth
@@ -13,7 +14,8 @@ from flask_mail import Mail, Message
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+# Configuramos Flask para que sepa dónde están los archivos estáticos de React
+app = Flask(__name__, static_folder='dist', static_url_path='/')
 
 allowed_origins_raw = os.environ.get("ALLOWED_ORIGINS", "")
 if not allowed_origins_raw:
@@ -272,10 +274,16 @@ Responde ESTRICTAMENTE con este JSON:
         return None
 
 # --- RUTAS ---
+
+# Modificamos la ruta principal para servir el index de React
 @app.route("/")
 def index():
-    u = get_usuario_actual()
-    return render_template("index.html", usuario=u)
+    return send_from_directory(app.static_folder, "index.html")
+
+# Agregamos un manejador para cualquier ruta de archivo estático (JS, CSS, imágenes)
+@app.errorhandler(404)
+def not_found(e):
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.route("/login")
 def login():
@@ -377,4 +385,4 @@ def ver_anuncio():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-    
+        
