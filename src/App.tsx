@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { AppState, WritingCorrectionInput } from './types';
+// IMPORTANTE: Quitamos la extensión .tsx de aquí también
+import { AppState, WritingCorrectionInput } from './types'; 
 import { Layout, BookOpen, PenTool, History, ChevronLeft } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -9,12 +10,10 @@ const App: React.FC = () => {
     materia: 'higiene'
   });
 
-  // Función para volver al inicio
   const goBack = () => setState(AppState.WELCOME);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* NAVBAR DINÁMICA: Cambia según donde estés */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white font-bold">M</div>
@@ -30,10 +29,8 @@ const App: React.FC = () => {
         )}
       </header>
 
-      {/* CONTENEDOR PRINCIPAL: Aquí es donde ocurre la magia */}
       <main className="flex-1 flex flex-col w-full max-w-7xl mx-auto overflow-hidden">
         
-        {/* PANTALLA 1: BIENVENIDA (Dashboard Estilo Google) */}
         {state === AppState.WELCOME && (
           <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             <div className="col-span-full mb-4">
@@ -51,12 +48,9 @@ const App: React.FC = () => {
               <h3 className="font-bold text-slate-800 text-lg">Corrección de Escritos</h3>
               <p className="text-sm text-slate-500 mt-2">Evaluación de informes de Higiene, Seguridad y Política con rigor académico.</p>
             </button>
-
-            {/* Agregaremos más botones aquí luego... */}
           </div>
         )}
 
-        {/* PANTALLA 2: ESCRITURA (INTERFAZ ANCHA Y LIMPIA) */}
         {state === AppState.WRITING_CORRECTION_INPUT && (
           <div className="flex-1 flex flex-col p-6 animate-fade-in h-full">
             <div className="mb-4">
@@ -64,7 +58,6 @@ const App: React.FC = () => {
               <p className="text-sm text-slate-500">Escribe o pega tu informe completo aquí abajo.</p>
             </div>
             
-            {/* ESTE ES EL CUADRO GIGANTE: Ocupa todo el espacio disponible */}
             <textarea 
               className="flex-1 w-full p-6 text-lg border-2 border-slate-200 rounded-2xl focus:border-indigo-500 focus:ring-0 resize-none shadow-inner bg-white"
               placeholder="Empieza a escribir..."
@@ -73,7 +66,11 @@ const App: React.FC = () => {
             />
 
             <div className="mt-6 flex justify-end gap-4">
-              <select className="bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium outline-none">
+              <select 
+                className="bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm font-medium outline-none"
+                value={writingInput.materia}
+                onChange={(e) => setWritingInput({...writingInput, materia: e.target.value})}
+              >
                 <option value="higiene">Higiene y Seguridad</option>
                 <option value="politica">Política</option>
                 <option value="alfabetizacion">Alfabetización</option>
@@ -84,11 +81,10 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
-
       </main>
     </div>
   );
 };
 
 export default App;
-          
+                
