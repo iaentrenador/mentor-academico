@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  FileText, 
   Lightbulb, 
   AlignLeft, 
   Share2, 
@@ -27,7 +26,6 @@ interface ActivitySelectionProps {
 }
 
 const activities: Activity[] = [
-  { id: 'PDF', title: 'Analizar PDF / Word', description: 'Sube tus apuntes para evaluación de cátedra.', icon: <FileText />, color: 'text-blue-600 bg-blue-50' },
   { id: 'EXPLAINER', title: 'Explicador de Conceptos', description: 'Dudas específicas con ejemplos didácticos.', icon: <Lightbulb />, color: 'text-amber-600 bg-amber-50' },
   { id: 'SUMMARY', title: 'Gestión de Resúmenes', description: 'Genera o corrige resúmenes profesionales.', icon: <AlignLeft />, color: 'text-emerald-600 bg-emerald-50' },
   { id: 'NETWORK', title: 'Red Conceptual', description: 'Visualiza relaciones jerárquicas al instante.', icon: <Share2 />, color: 'text-indigo-600 bg-indigo-50' },
@@ -83,3 +81,4 @@ const ActivitySelection: React.FC<ActivitySelectionProps> = ({ onSelect }) => {
 };
 
 export default ActivitySelection;
+            
