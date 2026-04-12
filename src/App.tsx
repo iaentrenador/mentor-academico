@@ -1,9 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData } from './types';
-import { Welcome } from './components/Welcome';
+// 1. Eliminamos AppState de aquí si lo manejas como Enum interno o asegúrate que esté en types
+import { WritingCorrectionInput, HistoryEntry, CognitiveMapData } from './types';
+// 2. CORRECCIÓN DE IMPORT: Quitamos las llaves porque Welcome es un export default
+import Welcome from './components/Welcome'; 
 import HistoryView from './components/HistoryView';
 import CognitiveMapView from './components/CognitiveMapView';
 import { BookOpen, ChevronLeft, Send, Loader2 } from 'lucide-react';
+
+// Definimos AppState si no viene del types para evitar errores
+enum AppState {
+  WELCOME = 'WELCOME',
+  HISTORY = 'HISTORY',
+  COGNITIVE_MAP = 'COGNITIVE_MAP',
+  WRITING_CORRECTION_INPUT = 'WRITING_CORRECTION_INPUT'
+}
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(AppState.WELCOME);
@@ -16,7 +26,6 @@ const App: React.FC = () => {
   });
   const [resultado, setResultado] = useState<any>(null);
 
-  // 1. Carga de datos inicial
   useEffect(() => {
     fetch('/api/usuario')
       .then(res => res.json())
@@ -30,7 +39,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // 2. Persistencia (ADN IA Studio)
   const saveToHistory = (type: string, title: string, data: any, score?: number) => {
     const newEntry: HistoryEntry = {
       id: crypto.randomUUID(),
@@ -45,13 +53,10 @@ const App: React.FC = () => {
     localStorage.setItem('academic_history', JSON.stringify(updatedHistory));
   };
 
-  // 3. Lógica analítica (ADN IA Studio)
+  // 3. AJUSTE DE MAPA COGNITIVO: Adaptamos a las nuevas propiedades de types.ts
   const getCognitiveMapData = (): CognitiveMapData => {
     const evaluations = history.filter(h => h.score !== undefined);
-    const averageScore = evaluations.length > 0 
-      ? evaluations.reduce((acc, curr) => acc + (curr.score || 0), 0) / evaluations.length 
-      : 0;
-
+    
     const masteredConceptsSet = new Set<string>();
     const weakAreasSet = new Set<string>();
 
@@ -60,20 +65,16 @@ const App: React.FC = () => {
       else if (h.score && h.score < 6) weakAreasSet.add(h.title.replace('Corrección: ', ''));
     });
 
+    // Ajustado a las propiedades EXACTAS que pusimos en types.ts
     return {
-      totalExercises: history.length,
-      averageScore,
-      masteredConcepts: Array.from(masteredConceptsSet).slice(0, 5),
-      weakAreas: Array.from(weakAreasSet).slice(0, 5),
-      progressOverTime: evaluations.map(e => ({ date: e.date, score: e.score || 0 })).reverse(),
-      activityDistribution: {}
+      concepts: Array.from(masteredConceptsSet).slice(0, 5),
+      connections: [], // Puedes llenarlo con lógica de relaciones luego
+      areas: Array.from(weakAreasSet).slice(0, 5)
     };
   };
 
-  // 4. Navegación del Historial
   const handleViewHistoryItem = (item: HistoryEntry) => {
     setResultado(item.data);
-    // Si era una corrección, volvemos a ese estado para mostrar el resultado
     if (item.type === 'CORRECTION') {
       setState(AppState.WRITING_CORRECTION_INPUT);
     }
@@ -96,7 +97,7 @@ const App: React.FC = () => {
           'CORRECTION', 
           `Corrección: ${writingInput.materia}`, 
           data.resultado, 
-          parseFloat(data.resultado.grade)
+          Number(data.resultado.grade)
         );
       } else {
         alert(data.error || "Error en la evaluación");
@@ -166,7 +167,7 @@ const App: React.FC = () => {
               <select 
                 className="w-full sm:w-auto bg-white border-2 border-slate-200 rounded-2xl px-6 py-4 font-black text-slate-700 outline-none focus:border-indigo-600 uppercase text-xs tracking-widest"
                 value={writingInput.materia}
-                onChange={(e) => setWritingInput({...writingInput, materia: e.target.value})}
+                onChange={(e) => setWritingInput({...writingInput, materia: e.target.value as any})}
               >
                 <option value="higiene">Higiene y Seguridad</option>
                 <option value="politica">Ciencia Política</option>
@@ -211,12 +212,10 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
-
       </main>
     </div>
   );
 };
 
 export default App;
-
-      
+          
