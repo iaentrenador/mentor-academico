@@ -273,6 +273,11 @@ TAREA: Evaluar la respuesta. Responde ESTRICTAMENTE con este JSON:
 # Estas rutas NO deben interferir con las rutas /api/
 # ===========================================================================
 
+# Endpoint de salud para evitar Port scan timeout en Render
+@app.route("/api/health")
+def health():
+    return jsonify({"status": "ok"}), 200
+
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, "index.html")
@@ -409,4 +414,8 @@ def ver_anuncio():
     return jsonify({"res": "Anuncio registrado", "restantes": consultas_permitidas(u) - u.consultas_usadas})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    # Render asigna dinámicamente el puerto; leerlo de la env var 'PORT' es crítico.
+    port = int(os.environ.get("PORT", 10000))
+    # Usar host '0.0.0.0' permite que el tráfico externo llegue al contenedor.
+    app.run(host="0.0.0.0", port=port)
+    
