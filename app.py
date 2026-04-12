@@ -14,8 +14,15 @@ from flask_mail import Mail, Message
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuramos Flask para que sepa dónde están los archivos estáticos de React
-app = Flask(__name__, static_folder='dist', static_url_path='/')
+# Aseguramos que la carpeta dist exista antes de inicializar Flask para evitar Error 500
+dist_path = os.path.join(os.path.dirname(__file__), 'dist')
+if not os.path.exists(dist_path):
+    os.makedirs(dist_path, exist_ok=True)
+    # Creamos un index.html de emergencia por si el build de Render tarda
+    with open(os.path.join(dist_path, 'index.html'), 'w') as f:
+        f.write("<html><body>Cargando Mentor IA... Por favor, recarga en un momento.</body></html>")
+
+app = Flask(__name__, static_folder=dist_path, static_url_path='/')
 
 allowed_origins_raw = os.environ.get("ALLOWED_ORIGINS", "")
 if not allowed_origins_raw:
@@ -139,7 +146,6 @@ def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consig
     response_format = {"type": "text"}
     prompt_sistema = f"{ACADEMIC_COACH_PERSONA}\n{perfil_materia}"
 
-    # --- TAREA: GENERAR EXAMEN (Simulacro dinámico) ---
     if tarea == "generar_examen":
         prompt_sistema = f"""{perfil_materia}
 Eres un Profesor Universitario creando un examen de opción múltiple. 
@@ -159,7 +165,6 @@ Responde ESTRICTAMENTE con este JSON:
         content = f"MATERIAL PARA EL EXAMEN: {material if material else 'Generar preguntas generales de ' + materia}"
         response_format = {"type": "json_object"}
 
-    # --- TAREA: EVALUAR SIMULACRO (Feedback detallado de examen) ---
     elif tarea == "evaluar_simulacro":
         prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}
 {perfil_materia}
@@ -273,17 +278,27 @@ Responde ESTRICTAMENTE con este JSON:
         logger.error("Error IA: %s", repr(e))
         return None
 
-# --- RUTAS ---
+# --- RUTAS DE SERVICIO REACT ---
 
-# Modificamos la ruta principal para servir el index de React
 @app.route("/")
 def index():
+    # Intenta enviar el index.html de React
     return send_from_directory(app.static_folder, "index.html")
 
-# Agregamos un manejador para cualquier ruta de archivo estático (JS, CSS, imágenes)
+@app.route("/<path:path>")
+def static_proxy(path):
+    # Si el archivo existe en la carpeta dist (como favicon, js, css), se envía.
+    # Si no, se envía index.html para que React maneje la ruta (SPA)
+    file_path = os.path.join(app.static_folder, path)
+    if os.path.exists(file_path):
+        return send_from_directory(app.static_folder, path)
+    return send_from_directory(app.static_folder, "index.html")
+
 @app.errorhandler(404)
 def not_found(e):
     return send_from_directory(app.static_folder, "index.html")
+
+# --- RUTAS DE LÓGICA DE NEGOCIO ---
 
 @app.route("/login")
 def login():
@@ -385,4 +400,4 @@ def ver_anuncio():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-        
+    
