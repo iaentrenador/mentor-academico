@@ -15,5 +15,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY . .
 
-ENV PORT=10000
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:10000", "--workers", "2", "--timeout", "120"]
+# Render asigna el puerto en la variable $PORT. 
+# Usamos la sintaxis de "shell form" (sin corchetes) para que 
+# la variable de entorno sea interpretada correctamente.
+CMD gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
