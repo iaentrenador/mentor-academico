@@ -3,6 +3,7 @@ import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData } from
 import Welcome from './components/Welcome'; 
 import HistoryView from './components/HistoryView';
 import CognitiveMapView from './components/CognitiveMapView';
+import ActivitySelection from './components/ActivitySelection'; // IMPORTADO
 import { BookOpen, ChevronLeft, Send, Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -12,7 +13,8 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [writingInput, setWritingInput] = useState<WritingCorrectionInput>({
     writing: '',
-    materia: 'higiene'
+    materia: 'higiene',
+    activityType: '' // Agregado para rastrear qué actividad se eligió
   });
   const [resultado, setResultado] = useState<any>(null);
 
@@ -57,7 +59,6 @@ const App: React.FC = () => {
       else if (h.score && h.score < 6) weakAreasSet.add(h.title.replace('Corrección: ', ''));
     });
 
-    // CORRECCIÓN: Ahora devuelve todas las propiedades que CognitiveMapView y types.ts exigen
     return {
       totalExercises: history.length,
       averageScore: averageScore,
@@ -77,6 +78,13 @@ const App: React.FC = () => {
     }
   };
 
+  // NUEVA FUNCIÓN: Maneja la selección de la tarjeta
+  const handleActivitySelect = (activityId: string) => {
+    setWritingInput(prev => ({ ...prev, activityType: activityId }));
+    // Por ahora, todas llevan al input de texto manual, excepto si implementamos PDF después
+    setState(AppState.WRITING_CORRECTION_INPUT);
+  };
+
   const handleEnviar = async () => {
     if (!writingInput.writing.trim()) return;
     setLoading(true);
@@ -92,7 +100,7 @@ const App: React.FC = () => {
         setUserStats(prev => ({ ...prev, restantes: data.restantes }));
         saveToHistory(
           'CORRECTION', 
-          `Corrección: ${writingInput.materia}`, 
+          `${writingInput.activityType || 'Corrección'}: ${writingInput.materia}`, 
           data.resultado, 
           Number(data.resultado.grade)
         );
@@ -130,11 +138,16 @@ const App: React.FC = () => {
         
         {state === AppState.WELCOME && (
           <Welcome 
-            onStart={() => setState(AppState.WRITING_CORRECTION_INPUT)}
+            onStart={() => setState(AppState.ACTIVITY_SELECTION)} // CAMBIADO: Ahora va al menú
             onViewHistory={() => setState(AppState.HISTORY)}
             onViewCognitiveMap={() => setState(AppState.COGNITIVE_MAP)}
             restantes={userStats.restantes}
           />
+        )}
+
+        {/* NUEVA SECCIÓN: Menú de Actividades */}
+        {state === AppState.ACTIVITY_SELECTION && (
+          <ActivitySelection onSelect={handleActivitySelect} />
         )}
 
         {state === AppState.HISTORY && (
@@ -154,9 +167,14 @@ const App: React.FC = () => {
 
         {state === AppState.WRITING_CORRECTION_INPUT && !resultado && (
           <div className="flex-1 flex flex-col gap-6 animate-in slide-in-from-bottom-4 duration-500">
+             <div className="flex items-center gap-2 mb-2">
+                <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">
+                  Modo: {writingInput.activityType}
+                </span>
+             </div>
             <textarea 
               className="flex-1 w-full p-8 text-xl border-2 border-slate-200 rounded-[2.5rem] focus:border-indigo-500 outline-none shadow-inner bg-white resize-none transition-all focus:ring-8 focus:ring-indigo-50"
-              placeholder="Pega tu informe técnico aquí para que el Mentor lo evalúe..."
+              placeholder="Pega tu texto aquí para que el Mentor lo procese..."
               value={writingInput.writing}
               onChange={(e) => setWritingInput({...writingInput, writing: e.target.value})}
             />
@@ -215,4 +233,4 @@ const App: React.FC = () => {
 };
 
 export default App;
-              
+  
