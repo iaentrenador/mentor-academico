@@ -1,19 +1,9 @@
 import React, { useState, useEffect } from 'react';
-// 1. Eliminamos AppState de aquí si lo manejas como Enum interno o asegúrate que esté en types
-import { WritingCorrectionInput, HistoryEntry, CognitiveMapData } from './types';
-// 2. CORRECCIÓN DE IMPORT: Quitamos las llaves porque Welcome es un export default
+import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData } from './types';
 import Welcome from './components/Welcome'; 
 import HistoryView from './components/HistoryView';
 import CognitiveMapView from './components/CognitiveMapView';
 import { BookOpen, ChevronLeft, Send, Loader2 } from 'lucide-react';
-
-// Definimos AppState si no viene del types para evitar errores
-enum AppState {
-  WELCOME = 'WELCOME',
-  HISTORY = 'HISTORY',
-  COGNITIVE_MAP = 'COGNITIVE_MAP',
-  WRITING_CORRECTION_INPUT = 'WRITING_CORRECTION_INPUT'
-}
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(AppState.WELCOME);
@@ -53,9 +43,11 @@ const App: React.FC = () => {
     localStorage.setItem('academic_history', JSON.stringify(updatedHistory));
   };
 
-  // 3. AJUSTE DE MAPA COGNITIVO: Adaptamos a las nuevas propiedades de types.ts
   const getCognitiveMapData = (): CognitiveMapData => {
     const evaluations = history.filter(h => h.score !== undefined);
+    const averageScore = evaluations.length > 0 
+      ? evaluations.reduce((acc, curr) => acc + (curr.score || 0), 0) / evaluations.length 
+      : 0;
     
     const masteredConceptsSet = new Set<string>();
     const weakAreasSet = new Set<string>();
@@ -65,10 +57,15 @@ const App: React.FC = () => {
       else if (h.score && h.score < 6) weakAreasSet.add(h.title.replace('Corrección: ', ''));
     });
 
-    // Ajustado a las propiedades EXACTAS que pusimos en types.ts
+    // CORRECCIÓN: Ahora devuelve todas las propiedades que CognitiveMapView y types.ts exigen
     return {
+      totalExercises: history.length,
+      averageScore: averageScore,
+      masteredConcepts: Array.from(masteredConceptsSet).slice(0, 5),
+      weakAreas: Array.from(weakAreasSet).slice(0, 5),
+      progressOverTime: evaluations.map(e => ({ date: e.date, score: e.score || 0 })).reverse(),
       concepts: Array.from(masteredConceptsSet).slice(0, 5),
-      connections: [], // Puedes llenarlo con lógica de relaciones luego
+      connections: [],
       areas: Array.from(weakAreasSet).slice(0, 5)
     };
   };
@@ -167,7 +164,7 @@ const App: React.FC = () => {
               <select 
                 className="w-full sm:w-auto bg-white border-2 border-slate-200 rounded-2xl px-6 py-4 font-black text-slate-700 outline-none focus:border-indigo-600 uppercase text-xs tracking-widest"
                 value={writingInput.materia}
-                onChange={(e) => setWritingInput({...writingInput, materia: e.target.value as any})}
+                onChange={(e) => setWritingInput({...writingInput, materia: e.target.value})}
               >
                 <option value="higiene">Higiene y Seguridad</option>
                 <option value="politica">Ciencia Política</option>
@@ -218,4 +215,4 @@ const App: React.FC = () => {
 };
 
 export default App;
-          
+              
