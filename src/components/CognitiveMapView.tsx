@@ -1,5 +1,6 @@
 import React from 'react';
-import { CognitiveMapData } from '../types';
+// Asegúrate de que CognitiveMapData en types.ts tenga todas las propiedades usadas abajo
+import { CognitiveMapData } from '../types'; 
 import { Brain, TrendingUp, Target, Award, BookOpen, AlertCircle, RotateCcw } from 'lucide-react';
 
 interface CognitiveMapViewProps {
@@ -30,7 +31,7 @@ const CognitiveMapView: React.FC<CognitiveMapViewProps> = ({ data, onBack }) => 
         </button>
       </div>
 
-      {/* STATS GRID - DISEÑO AGRESIVO */}
+      {/* STATS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm hover:shadow-xl transition-all">
           <div className="flex items-center gap-4 mb-4">
@@ -39,7 +40,9 @@ const CognitiveMapView: React.FC<CognitiveMapViewProps> = ({ data, onBack }) => 
             </div>
             <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Ejercicios</span>
           </div>
-          <div className="text-5xl font-black text-slate-800 tracking-tighter">{data.totalExercises}</div>
+          <div className="text-5xl font-black text-slate-800 tracking-tighter">
+            {data.totalExercises || 0}
+          </div>
           <p className="text-[10px] font-bold text-indigo-500 uppercase mt-2 tracking-tighter italic">Entrenamientos completados</p>
         </div>
 
@@ -50,7 +53,9 @@ const CognitiveMapView: React.FC<CognitiveMapViewProps> = ({ data, onBack }) => 
             </div>
             <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Promedio</span>
           </div>
-          <div className="text-5xl font-black text-slate-800 tracking-tighter">{data.averageScore.toFixed(1)}</div>
+          <div className="text-5xl font-black text-slate-800 tracking-tighter">
+            {(data.averageScore || 0).toFixed(1)}
+          </div>
           <p className="text-[10px] font-bold text-emerald-500 uppercase mt-2 tracking-tighter italic">Nivel de efectividad</p>
         </div>
 
@@ -62,7 +67,7 @@ const CognitiveMapView: React.FC<CognitiveMapViewProps> = ({ data, onBack }) => 
             <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Rango</span>
           </div>
           <div className="text-3xl font-black text-slate-800 uppercase italic">
-            {data.averageScore >= 8.5 ? 'Experto' : data.averageScore >= 7 ? 'Avanzado' : 'En Proceso'}
+            {(data.averageScore || 0) >= 8.5 ? 'Experto' : (data.averageScore || 0) >= 7 ? 'Avanzado' : 'En Proceso'}
           </div>
           <p className="text-[10px] font-bold text-amber-500 uppercase mt-2 tracking-tighter italic">Competencia actual</p>
         </div>
@@ -76,8 +81,8 @@ const CognitiveMapView: React.FC<CognitiveMapViewProps> = ({ data, onBack }) => 
             <h3 className="font-black text-white uppercase tracking-widest italic">Conceptos Dominados</h3>
           </div>
           <div className="flex flex-wrap gap-3">
-            {data.masteredConcepts.length > 0 ? (
-              data.masteredConcepts.map((concept, i) => (
+            {data.masteredConcepts && data.masteredConcepts.length > 0 ? (
+              data.masteredConcepts.map((concept: string, i: number) => (
                 <span key={i} className="px-4 py-2 bg-indigo-500/10 text-indigo-300 text-[10px] font-black rounded-xl border border-indigo-500/20 uppercase tracking-widest">
                   {concept}
                 </span>
@@ -95,8 +100,8 @@ const CognitiveMapView: React.FC<CognitiveMapViewProps> = ({ data, onBack }) => 
             <h3 className="font-black text-slate-800 uppercase tracking-widest italic">Áreas de Mejora</h3>
           </div>
           <div className="flex flex-wrap gap-3">
-            {data.weakAreas.length > 0 ? (
-              data.weakAreas.map((area, i) => (
+            {data.weakAreas && data.weakAreas.length > 0 ? (
+              data.weakAreas.map((area: string, i: number) => (
                 <span key={i} className="px-4 py-2 bg-amber-50 text-amber-700 text-[10px] font-black rounded-xl border border-amber-100 uppercase tracking-widest">
                   {area}
                 </span>
@@ -115,11 +120,10 @@ const CognitiveMapView: React.FC<CognitiveMapViewProps> = ({ data, onBack }) => 
           <h3 className="font-black text-slate-800 uppercase tracking-widest italic">Evolución del Aprendizaje</h3>
         </div>
         
-        {data.progressOverTime.length > 1 ? (
+        {data.progressOverTime && data.progressOverTime.length > 1 ? (
           <div className="h-64 flex items-end gap-3 px-4 pb-8 border-b-2 border-slate-50">
-            {data.progressOverTime.map((p, i) => (
+            {data.progressOverTime.map((p: any, i: number) => (
               <div key={i} className="flex-1 flex flex-col items-center group relative">
-                {/* Tooltip de nota */}
                 <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-all bg-slate-900 text-white text-[10px] font-black px-2 py-1 rounded mb-2">
                   {p.score.toFixed(1)}
                 </div>
