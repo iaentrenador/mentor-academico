@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData } from './types';
 import { Welcome } from './components/Welcome';
-// Nota: Deberás crear estos componentes luego, por ahora los preparamos en el switch
-import { BookOpen, ChevronLeft, Send, Loader2, Award } from 'lucide-react';
+import HistoryView from './components/HistoryView';
+import CognitiveMapView from './components/CognitiveMapView';
+import { BookOpen, ChevronLeft, Send, Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(AppState.WELCOME);
@@ -15,15 +16,13 @@ const App: React.FC = () => {
   });
   const [resultado, setResultado] = useState<any>(null);
 
-  // 1. Cargar datos del backend y del Historial Local (ADN IA Studio)
+  // 1. Carga de datos inicial
   useEffect(() => {
-    // Backend
     fetch('/api/usuario')
       .then(res => res.json())
       .then(data => setUserStats(data))
       .catch(err => console.error("Error al cargar usuario:", err));
 
-    // Historial Local
     const savedHistory = localStorage.getItem('academic_history');
     if (savedHistory) {
       try { setHistory(JSON.parse(savedHistory)); } 
@@ -31,7 +30,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // 2. Función para guardar en historial (ADN IA Studio)
+  // 2. Persistencia (ADN IA Studio)
   const saveToHistory = (type: string, title: string, data: any, score?: number) => {
     const newEntry: HistoryEntry = {
       id: crypto.randomUUID(),
@@ -46,7 +45,7 @@ const App: React.FC = () => {
     localStorage.setItem('academic_history', JSON.stringify(updatedHistory));
   };
 
-  // 3. Lógica del Mapa Cognitivo (ADN IA Studio)
+  // 3. Lógica analítica (ADN IA Studio)
   const getCognitiveMapData = (): CognitiveMapData => {
     const evaluations = history.filter(h => h.score !== undefined);
     const averageScore = evaluations.length > 0 
@@ -57,8 +56,8 @@ const App: React.FC = () => {
     const weakAreasSet = new Set<string>();
 
     history.forEach(h => {
-      if (h.score && h.score > 8) masteredConceptsSet.add(h.title);
-      else if (h.score && h.score < 6) weakAreasSet.add(h.title);
+      if (h.score && h.score >= 8) masteredConceptsSet.add(h.title.replace('Corrección: ', ''));
+      else if (h.score && h.score < 6) weakAreasSet.add(h.title.replace('Corrección: ', ''));
     });
 
     return {
@@ -66,9 +65,18 @@ const App: React.FC = () => {
       averageScore,
       masteredConcepts: Array.from(masteredConceptsSet).slice(0, 5),
       weakAreas: Array.from(weakAreasSet).slice(0, 5),
-      progressOverTime: evaluations.map(e => ({ date: e.date, score: e.score || 0 })),
-      activityDistribution: {} // Se puede completar luego
+      progressOverTime: evaluations.map(e => ({ date: e.date, score: e.score || 0 })).reverse(),
+      activityDistribution: {}
     };
+  };
+
+  // 4. Navegación del Historial
+  const handleViewHistoryItem = (item: HistoryEntry) => {
+    setResultado(item.data);
+    // Si era una corrección, volvemos a ese estado para mostrar el resultado
+    if (item.type === 'CORRECTION') {
+      setState(AppState.WRITING_CORRECTION_INPUT);
+    }
   };
 
   const handleEnviar = async () => {
@@ -84,8 +92,6 @@ const App: React.FC = () => {
       if (response.ok) {
         setResultado(data.resultado);
         setUserStats(prev => ({ ...prev, restantes: data.restantes }));
-        
-        // GUARDAMOS EN HISTORIAL (ADN IA Studio)
         saveToHistory(
           'CORRECTION', 
           `Corrección: ${writingInput.materia}`, 
@@ -104,27 +110,26 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
+      <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">
+          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-200">
             <BookOpen size={18} />
           </div>
-          <h1 className="font-black text-slate-800 text-lg tracking-tighter uppercase">MENTOR IA</h1>
+          <h1 className="font-black text-slate-800 text-lg tracking-tighter uppercase italic">MENTOR IA</h1>
         </div>
         
         {state !== AppState.WELCOME && (
           <button 
             onClick={() => { setResultado(null); setState(AppState.WELCOME); }}
-            className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-colors text-sm font-bold uppercase tracking-tighter"
+            className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-all text-xs font-black uppercase tracking-widest"
           >
-            <ChevronLeft size={18} /> Volver
+            <ChevronLeft size={16} strokeWidth={3} /> VOLVER
           </button>
         )}
       </header>
 
       <main className="flex-1 flex flex-col w-full max-w-5xl mx-auto p-6">
         
-        {/* PANTALLA: BIENVENIDA */}
         {state === AppState.WELCOME && (
           <Welcome 
             onStart={() => setState(AppState.WRITING_CORRECTION_INPUT)}
@@ -134,18 +139,32 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* PANTALLA: EDITOR (Módulo de entrenamiento) */}
+        {state === AppState.HISTORY && (
+          <HistoryView 
+            history={history} 
+            onBack={() => setState(AppState.WELCOME)} 
+            onViewItem={handleViewHistoryItem}
+          />
+        )}
+
+        {state === AppState.COGNITIVE_MAP && (
+          <CognitiveMapView 
+            data={getCognitiveMapData()} 
+            onBack={() => setState(AppState.WELCOME)} 
+          />
+        )}
+
         {state === AppState.WRITING_CORRECTION_INPUT && !resultado && (
           <div className="flex-1 flex flex-col gap-6 animate-in slide-in-from-bottom-4 duration-500">
             <textarea 
-              className="flex-1 w-full p-8 text-xl border-2 border-slate-200 rounded-[2.5rem] focus:border-indigo-500 outline-none shadow-inner bg-white resize-none"
-              placeholder="Pega tu informe técnico aquí..."
+              className="flex-1 w-full p-8 text-xl border-2 border-slate-200 rounded-[2.5rem] focus:border-indigo-500 outline-none shadow-inner bg-white resize-none transition-all focus:ring-8 focus:ring-indigo-50"
+              placeholder="Pega tu informe técnico aquí para que el Mentor lo evalúe..."
               value={writingInput.writing}
               onChange={(e) => setWritingInput({...writingInput, writing: e.target.value})}
             />
-            <div className="flex justify-between items-center gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <select 
-                className="bg-white border-2 border-slate-200 rounded-2xl px-6 py-4 font-bold text-slate-700 outline-none focus:border-indigo-600"
+                className="w-full sm:w-auto bg-white border-2 border-slate-200 rounded-2xl px-6 py-4 font-black text-slate-700 outline-none focus:border-indigo-600 uppercase text-xs tracking-widest"
                 value={writingInput.materia}
                 onChange={(e) => setWritingInput({...writingInput, materia: e.target.value})}
               >
@@ -156,48 +175,40 @@ const App: React.FC = () => {
               <button 
                 onClick={handleEnviar}
                 disabled={loading || !writingInput.writing}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-4 rounded-2xl font-black transition-all shadow-xl flex items-center gap-2"
+                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-4 rounded-2xl font-black transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 uppercase tracking-widest italic"
               >
                 {loading ? <Loader2 className="animate-spin" /> : <Send size={20} />}
-                {loading ? "PROCESANDO..." : "ANALIZAR"}
+                {loading ? "PROCESANDO..." : "ANALIZAR AHORA"}
               </button>
             </div>
           </div>
         )}
 
-        {/* PANTALLA: RESULTADOS (Igual que antes, pero ya guardado en historial) */}
         {resultado && state === AppState.WRITING_CORRECTION_INPUT && (
            <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
             <div className="bg-indigo-600 p-8 text-white flex justify-between items-center">
               <div>
-                <h3 className="text-3xl font-black tracking-tighter tracking-widest uppercase italic">Evaluación Exitosa</h3>
-                <p className="opacity-80 font-bold text-xs">Materia: {writingInput.materia}</p>
+                <h3 className="text-3xl font-black tracking-tighter uppercase italic">Evaluación Técnica</h3>
+                <p className="opacity-80 font-bold text-xs uppercase tracking-widest">Materia: {writingInput.materia}</p>
               </div>
-              <div className="text-center bg-white/20 p-4 rounded-2xl backdrop-blur-md min-w-[100px]">
+              <div className="text-center bg-white/20 p-4 rounded-2xl backdrop-blur-md min-w-[100px] border border-white/20">
                 <span className="block text-4xl font-black">{resultado.grade}</span>
-                <span className="text-[10px] uppercase font-bold tracking-tighter">Nota</span>
+                <span className="text-[10px] uppercase font-bold tracking-tighter">Nota Final</span>
               </div>
             </div>
-            {/* Contenido del resultado... (puedes mantener el que tenías) */}
-            <div className="p-8">
-               <p className="text-slate-600 leading-relaxed font-medium">{resultado.performanceAnalysis}</p>
-               <button onClick={() => {setResultado(null); setState(AppState.WELCOME)}} className="mt-6 text-indigo-600 font-bold hover:underline italic">← Volver al inicio</button>
+            
+            <div className="p-8 space-y-6 overflow-y-auto max-h-[60vh]">
+               <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                  <h4 className="font-black text-slate-800 mb-3 uppercase text-xs tracking-widest">Análisis de Desempeño</h4>
+                  <p className="text-slate-600 leading-relaxed font-medium">{resultado.performanceAnalysis}</p>
+               </div>
+               <button 
+                onClick={() => {setResultado(null); setState(AppState.WELCOME)}} 
+                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg"
+               >
+                 Finalizar Revisión
+               </button>
             </div>
-          </div>
-        )}
-
-        {/* PANTALLAS FUTURAS: Aquí irán los componentes de Historial y Mapa */}
-        {state === AppState.HISTORY && (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-black text-slate-400 uppercase tracking-widest">Módulo de Historial</h2>
-            <p className="text-slate-500">Próximo paso: Crear HistoryView.tsx con tus {history.length} registros.</p>
-          </div>
-        )}
-
-        {state === AppState.COGNITIVE_MAP && (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-black text-slate-400 uppercase tracking-widest">Mapa Cognitivo</h2>
-            <p className="text-slate-500">Promedio actual: {getCognitiveMapData().averageScore.toFixed(1)}</p>
           </div>
         )}
 
@@ -207,4 +218,5 @@ const App: React.FC = () => {
 };
 
 export default App;
+
       
