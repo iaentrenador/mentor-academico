@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData, SummaryGenerationResult, SummaryCorrectionResult, ConceptualNetworkResult, UniversityText } from './types';
+import { AppState, WritingCorrectionInput, WritingCorrectionResult, HistoryEntry, CognitiveMapData, SummaryGenerationResult, SummaryCorrectionResult, ConceptualNetworkResult, UniversityText } from './types';
 import Welcome from './components/Welcome'; 
 import HistoryView from './components/HistoryView';
 import CognitiveMapView from './components/CognitiveMapView';
@@ -14,6 +14,9 @@ import SummaryCorrectionResultsView from './components/SummaryCorrectionResultsV
 // IMPORTACIÓN COMPONENTES RED CONCEPTUAL
 import ConceptualNetworkInputView from './components/ConceptualNetworkInputView';
 import ConceptualNetworkView from './components/ConceptualNetworkView';
+// IMPORTACIÓN NUEVA CORRECCIÓN DE ESCRITOS
+import WritingCorrectionForm from './components/WritingCorrectionForm';
+import CorrectionResultsView from './components/CorrectionResultsView';
 
 import { BookOpen, ChevronLeft } from 'lucide-react';
 
@@ -23,17 +26,16 @@ const App: React.FC = () => {
   const [userStats, setUserStats] = useState({ logueado: false, restantes: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
-  const [writingInput, setWritingInput] = useState<WritingCorrectionInput & { query: string; profile: string; activityTitle: string; activityType: string }>({
+  const [writingInput, setWritingInput] = useState<WritingCorrectionInput>({
     writing: '',
+    prompt: '',
+    sourceText: '',
     materia: 'higiene_upe',
     activityType: '',
-    query: '',
-    profile: 'higiene_upe',
     activityTitle: '' 
   });
   
   const [resultado, setResultado] = useState<any>(null);
-  // Nuevo estado para el resultado de la red conceptual
   const [networkResult, setNetworkResult] = useState<ConceptualNetworkResult | null>(null);
 
   useEffect(() => {
@@ -85,9 +87,10 @@ const App: React.FC = () => {
     setResultado(item.data);
     if (item.type === 'SUMMARY_GEN') setState(AppState.SUMMARY_GENERATION_RESULTS);
     else if (item.type === 'SUMMARY_CORR') setState(AppState.SUMMARY_CORRECTION_RESULTS);
+    else if (item.type === 'WRITING_CORR') setState(AppState.WRITING_CORRECTION_RESULTS);
     else if (item.type === 'NETWORK') {
       setNetworkResult(item.data);
-      setResultado(null); // Limpiamos resultado general para usar el específico
+      setResultado(null);
     }
     else setState(AppState.WRITING_CORRECTION_INPUT);
   };
@@ -103,24 +106,41 @@ const App: React.FC = () => {
       MASTER: 'Sintetizador Maestro'
     };
 
-    setWritingInput(prev => ({ 
-      ...prev, 
-      activityType: activityId,
-      activityTitle: activityTitles[activityId] || 'Actividad'
-    }));
-
     if (activityId === 'SUMMARY') {
       setState(AppState.SUMMARY_SELECTION);
     } else if (activityId === 'NETWORK') {
       setNetworkResult(null);
-      setState(AppState.TEXT_DISPLAY); // Reutilizamos TEXT_DISPLAY o creamos uno nuevo si lo prefieres
+      setState(AppState.TEXT_DISPLAY);
+    } else if (activityId === 'CORRECTION') {
+      setWritingInput(prev => ({ ...prev, activityType: 'CORRECTION' }));
+      setState(AppState.WRITING_CORRECTION_INPUT);
     } else {
+      setWritingInput(prev => ({ ...prev, activityType: activityId, activityTitle: activityTitles[activityId] }));
       setState(AppState.WRITING_CORRECTION_INPUT);
     }
   };
 
-  // --- LÓGICA ESPECÍFICA PARA RESÚMENES ---
+  // --- LÓGICA CORRECCIÓN DE ESCRITOS (NUEVA) ---
+  const handleWritingCorrection = async (input: WritingCorrectionInput) => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/corregir_escrito', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input)
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setResultado(data.resultado);
+        setUserStats(prev => ({ ...prev, restantes: data.restantes }));
+        saveToHistory('WRITING_CORR', `Corrección: ${input.materia}`, data.resultado, data.resultado.grade);
+        setState(AppState.WRITING_CORRECTION_RESULTS);
+      } else alert(data.error);
+    } catch (e) { alert("Error de conexión"); }
+    finally { setLoading(false); }
+  };
 
+  // --- LÓGICA ESPECÍFICA PARA RESÚMENES ---
   const handleSummaryGeneration = async (title: string, content: string) => {
     setLoading(true);
     try {
@@ -180,45 +200,24 @@ const App: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  // --- FIN LÓGICA RESÚMENES ---
-
+  // --- LÓGICA DATA ENTRY GENERAL (MANTENIDA PARA OTROS MÓDULOS) ---
   const handleDataSubmit = async (data: { text: string; query?: string; profile: string }) => {
     setLoading(true);
-    
-    const payload = {
-      ...writingInput,
-      writing: data.text,
-      query: data.query || '',
-      materia: data.profile, 
-      profile: data.profile
-    };
-
+    const payload = { ...writingInput, writing: data.text, query: data.query || '', materia: data.profile };
     try {
-      const response = await fetch('/api/corregir_escrito', {
+      const response = await fetch(`/api/${writingInput.activityType?.toLowerCase()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
       const resData = await response.json();
-      
       if (response.ok) {
         setResultado(resData.resultado);
         setUserStats(prev => ({ ...prev, restantes: resData.restantes }));
-        saveToHistory(
-          'CORRECTION', 
-          `${writingInput.activityType}: ${data.profile}`, 
-          resData.resultado, 
-          Number(resData.resultado.grade || 0)
-        );
-      } else {
-        alert(resData.error || "Error en la evaluación");
-      }
-    } catch (error) {
-      alert("Error de conexión");
-    } finally {
-      setLoading(false);
-    }
+        saveToHistory('ACTIVITY', writingInput.activityTitle, resData.resultado);
+      } else alert(resData.error);
+    } catch (error) { alert("Error de conexión"); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -254,6 +253,21 @@ const App: React.FC = () => {
 
         {state === AppState.ACTIVITY_SELECTION && (
           <ActivitySelection onSelect={handleActivitySelect} />
+        )}
+
+        {/* --- MÓDULO CORRECCIÓN DE ESCRITOS --- */}
+        {state === AppState.WRITING_CORRECTION_INPUT && writingInput.activityType === 'CORRECTION' && (
+          <WritingCorrectionForm 
+            isLoading={loading}
+            onSubmit={handleWritingCorrection}
+          />
+        )}
+
+        {state === AppState.WRITING_CORRECTION_RESULTS && resultado && (
+          <CorrectionResultsView 
+            result={resultado}
+            onRetry={() => { setResultado(null); setState(AppState.WRITING_CORRECTION_INPUT); }}
+          />
         )}
 
         {/* --- RENDERING MÓDULO RED CONCEPTUAL --- */}
@@ -309,8 +323,8 @@ const App: React.FC = () => {
             onRestart={() => { setResultado(null); setState(AppState.SUMMARY_SELECTION); }}
           />
         )}
-        {/* --- FIN RENDERING MÓDULO RESÚMENES --- */}
 
+        {/* --- OTROS ESTADOS --- */}
         {state === AppState.HISTORY && (
           <HistoryView 
             history={history} 
@@ -333,7 +347,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {state === AppState.WRITING_CORRECTION_INPUT && !resultado && !loading && (
+        {state === AppState.WRITING_CORRECTION_INPUT && writingInput.activityType !== 'CORRECTION' && !resultado && !loading && (
           <DataEntryView 
             activityId={writingInput.activityType || ''}
             activityTitle={writingInput.activityTitle || ''}
@@ -344,33 +358,14 @@ const App: React.FC = () => {
         )}
 
         {resultado && state === AppState.WRITING_CORRECTION_INPUT && (
-           <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
-            <div className="bg-indigo-600 p-8 text-white flex justify-between items-center">
-              <div>
-                <h3 className="text-3xl font-black tracking-tighter uppercase italic">Evaluación Técnica</h3>
-                <p className="opacity-80 font-bold text-xs uppercase tracking-widest">
-                  Perfil: {writingInput.materia}
-                </p>
-              </div>
-              <div className="text-center bg-white/20 p-4 rounded-2xl backdrop-blur-md min-w-[100px] border border-white/20">
-                <span className="block text-4xl font-black">{resultado.grade || '-'}</span>
-                <span className="text-[10px] uppercase font-bold tracking-tighter">Nota / Nivel</span>
-              </div>
+          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+            {/* ... visualizador antiguo para otras tareas ... */}
+            <div className="bg-indigo-600 p-8 text-white">
+              <h3 className="text-3xl font-black italic uppercase">Resultado</h3>
             </div>
-            
-            <div className="p-8 space-y-6 overflow-y-auto max-h-[60vh]">
-               <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 prose prose-indigo max-w-none">
-                  <h4 className="font-black text-slate-800 mb-3 uppercase text-xs tracking-widest">Respuesta del Mentor</h4>
-                  <p className="text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">
-                    {resultado.explanation || resultado.performanceAnalysis}
-                  </p>
-               </div>
-               <button 
-                onClick={() => {setResultado(null); setState(AppState.WELCOME)}} 
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg"
-               >
-                 Finalizar Revisión
-               </button>
+            <div className="p-8">
+              <p className="text-slate-600 whitespace-pre-wrap">{resultado.explanation || JSON.stringify(resultado)}</p>
+              <button onClick={() => setResultado(null)} className="mt-6 w-full py-4 bg-slate-900 text-white rounded-2xl font-bold">Cerrar</button>
             </div>
           </div>
         )}
@@ -380,4 +375,4 @@ const App: React.FC = () => {
 };
 
 export default App;
-                             
+      
