@@ -67,7 +67,7 @@ TAREAS_VALIDAS = {
     "explicar", "resumir", "evaluar", "cargar_material",
     "preparar_oratoria", "generar_examen", "generar_rap", "generar_red",
     "corregir_escrito", "corregir_resumen", "explicar_concepto", "evaluar_simulacro",
-    "generar_resumen" # AGREGADA
+    "generar_resumen"
 }
 MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 3_000
 CONSULTAS_BASE, CONSULTAS_POR_AD, MAX_BLOQUES_PUBLICIDAD = 5, 5, 2
@@ -115,7 +115,7 @@ def resetear_si_nuevo_dia(u):
 def consultas_permitidas(u):
     return CONSULTAS_BASE + u.bloques_publicidad_vistos * CONSULTAS_POR_AD
 
-# --- IA LOGIC (MODIFICADA PARA RESÚMENES) ---
+# --- IA LOGIC (MODIFICADA PARA RED CONCEPTUAL) ---
 def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consigna="", query=""):
     perfil_materia = PERFILES_MATERIA.get(materia, "ROL: Mentor Académico Universitario.")
 
@@ -159,8 +159,22 @@ Compara el texto original con el resumen del alumno y responde ESTRICTAMENTE con
         response_format = {"type": "json_object"}
 
     elif tarea == "generar_red":
-        prompt_sistema += '\nResponde en JSON: {"title": "...", "summary": "...", "nodes": [], "edges": []}'
-        content = f"TEXTO: {material if material else texto}"
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
+Estructura el texto en una red jerárquica. Responde ÚNICAMENTE con este JSON:
+{{
+  "title": "Título de la red",
+  "summary": "Análisis estructural de la red",
+  "nodes": [
+    {{"id": "1", "label": "Concepto Núcleo", "type": "core"}},
+    {{"id": "2", "label": "Concepto Principal", "type": "main"}},
+    {{"id": "3", "label": "Concepto Secundario", "type": "secondary"}}
+  ],
+  "edges": [
+    {{"from": "1", "to": "2", "label": "verbo de enlace"}}
+  ]
+}}
+REGLAS: Solo un nodo 'core'. Nodos 'main' derivan del core. 'secondary' son detalles de los main."""
+        content = f"TEXTO A MAPEAR: {texto}"
         response_format = {"type": "json_object"}
     
     else:
@@ -245,6 +259,17 @@ def api_corregir_resumen():
     if not u: return jsonify({"error": "No autenticado"}), 401
     data = request.json
     res = ejecutar_tarea_ia("corregir_resumen", data.get("sourceText", ""), "", u, query=data.get("userSummary", ""))
+    if not res: return jsonify({"error": "Error IA"}), 500
+    u.consultas_usadas += 1
+    db.session.commit()
+    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
+
+@app.route("/api/generar_red", methods=["POST"])
+def api_generar_red():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    data = request.json
+    res = ejecutar_tarea_ia("generar_red", data.get("texto", ""), "", u, materia=data.get("materia", "general"))
     if not res: return jsonify({"error": "Error IA"}), 500
     u.consultas_usadas += 1
     db.session.commit()
