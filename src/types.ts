@@ -91,6 +91,26 @@ export interface SummaryCorrectionResult {
   improvedVersion: string;
 }
 
+// 6.3 Interfaz para el resultado de Red Conceptual (NUEVO)
+export interface ConceptualNode {
+  id: string;
+  label: string;
+  type: 'core' | 'main' | 'secondary';
+}
+
+export interface ConceptualEdge {
+  from: string;
+  to: string;
+  label: string;
+}
+
+export interface ConceptualNetworkResult {
+  title: string;
+  summary: string;
+  nodes: ConceptualNode[];
+  edges: ConceptualEdge[];
+}
+
 // 7. Estado General
 export interface UserStats {
   logueado: boolean;
