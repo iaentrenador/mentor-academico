@@ -66,7 +66,8 @@ MODEL_ID = "llama-3.3-70b-versatile"
 TAREAS_VALIDAS = {
     "explicar", "resumir", "evaluar", "cargar_material",
     "preparar_oratoria", "generar_examen", "generar_rap", "generar_red",
-    "corregir_escrito", "corregir_resumen", "explicar_concepto", "evaluar_simulacro"
+    "corregir_escrito", "corregir_resumen", "explicar_concepto", "evaluar_simulacro",
+    "generar_resumen" # AGREGADA
 }
 MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 3_000
 CONSULTAS_BASE, CONSULTAS_POR_AD, MAX_BLOQUES_PUBLICIDAD = 5, 5, 2
@@ -114,14 +115,9 @@ def resetear_si_nuevo_dia(u):
 def consultas_permitidas(u):
     return CONSULTAS_BASE + u.bloques_publicidad_vistos * CONSULTAS_POR_AD
 
-# --- IA LOGIC (MODIFICADA PARA RECIBIR QUERY) ---
+# --- IA LOGIC (MODIFICADA PARA RESÚMENES) ---
 def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consigna="", query=""):
     perfil_materia = PERFILES_MATERIA.get(materia, "ROL: Mentor Académico Universitario.")
-
-    try:
-        cognitivo = json.loads(usuario.perfil_aprendizaje)
-    except (json.JSONDecodeError, TypeError):
-        cognitivo = {}
 
     response_format = {"type": "text"}
     prompt_sistema = f"{ACADEMIC_COACH_PERSONA}\n{perfil_materia}"
@@ -131,6 +127,20 @@ def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consig
 Responde ESTRICTAMENTE con este JSON:
 {{"explanation": "...", "examples": [], "keyTakeaways": [], "relatedConcepts": []}}"""
         content = f"MATERIAL DE ESTUDIO: {texto}\nDUDA ESPECÍFICA DEL ALUMNO: {query}\nCONTEXTO ADICIONAL: {material}"
+        response_format = {"type": "json_object"}
+
+    elif tarea == "generar_resumen":
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
+Responde ESTRICTAMENTE con este JSON:
+{{"title": "...", "executiveSummary": "...", "keyConcepts": [{{"concept": "...", "definition": "..."}}], "conclusions": "..."}}"""
+        content = f"TITULO SUGERIDO: {query}\nCONTENIDO PARA RESUMIR: {texto}"
+        response_format = {"type": "json_object"}
+
+    elif tarea == "corregir_resumen":
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
+Compara el texto original con el resumen del alumno y responde ESTRICTAMENTE con este JSON:
+{{"grade": 0-10, "status": "Excelente/Satisfactorio/Insuficiente", "performanceAnalysis": "...", "strengths": [], "weaknesses": [], "omissions": [], "improvementSuggestions": [], "suggestedRetry": "...", "improvedVersion": "..."}}"""
+        content = f"TEXTO FUENTE: {texto}\nRESUMEN DEL ALUMNO: {query}"
         response_format = {"type": "json_object"}
 
     elif tarea == "generar_examen":
@@ -218,6 +228,28 @@ def info_usuario():
         "restantes": max(0, consultas_permitidas(u) - u.consultas_usadas)
     })
 
+@app.route("/api/generar_resumen", methods=["POST"])
+def api_generar_resumen():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    data = request.json
+    res = ejecutar_tarea_ia("generar_resumen", data.get("content", ""), "", u, query=data.get("title", ""))
+    if not res: return jsonify({"error": "Error IA"}), 500
+    u.consultas_usadas += 1
+    db.session.commit()
+    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
+
+@app.route("/api/corregir_resumen", methods=["POST"])
+def api_corregir_resumen():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    data = request.json
+    res = ejecutar_tarea_ia("corregir_resumen", data.get("sourceText", ""), "", u, query=data.get("userSummary", ""))
+    if not res: return jsonify({"error": "Error IA"}), 500
+    u.consultas_usadas += 1
+    db.session.commit()
+    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
+
 @app.route("/api/<tarea>", methods=["POST"])
 def manejar_tarea(tarea):
     if tarea not in TAREAS_VALIDAS:
@@ -227,37 +259,29 @@ def manejar_tarea(tarea):
         return jsonify({"error": "No autenticado"}), 401
 
     data = request.get_json(silent=True) or {}
-    
-    # Capturamos los datos enviados desde DataEntryView
     texto = data.get("writing", data.get("texto", "")).strip()
     materia = data.get("materia", "general")
-    query_usuario = data.get("query", "") # CAPTURAMOS LA DUDA DEL EXPLICADOR
+    query_usuario = data.get("query", "")
 
-    if len(texto) > MAX_TEXTO:
-        return jsonify({"error": "Texto muy largo"}), 400
-
-    resetear_si_nuevo_dia(u)
-    permitidas = consultas_permitidas(u)
-    if u.consultas_usadas >= permitidas:
+    if u.consultas_usadas >= consultas_permitidas(u):
         return jsonify({"error": "Consultas agotadas."}), 403
 
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia, query=query_usuario)
     if res is None:
         return jsonify({"error": "Error de conexión con la IA."}), 503
 
-    tareas_json = ["generar_examen", "generar_rap", "generar_red", "corregir_escrito", "explicar_concepto"]
+    tareas_json = ["generar_examen", "generar_rap", "generar_red", "corregir_escrito", "explicar_concepto", "generar_resumen", "corregir_resumen"]
     try:
         resultado = json.loads(res) if tarea in tareas_json else res
-    except (json.JSONDecodeError, TypeError):
+    except:
         resultado = res
 
     u.consultas_usadas += 1
     u.ultima_consulta = datetime.datetime.now(datetime.timezone.utc)
     db.session.commit()
-
-    return jsonify({"resultado": resultado, "restantes": permitidas - u.consultas_usadas})
+    return jsonify({"resultado": resultado, "restantes": consultas_permitidas(u) - u.consultas_usadas})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-                     
+    
