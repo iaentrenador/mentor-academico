@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData, SummaryGenerationResult, SummaryCorrectionResult } from './types';
+import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData, SummaryGenerationResult, SummaryCorrectionResult, ConceptualNetworkResult, UniversityText } from './types';
 import Welcome from './components/Welcome'; 
 import HistoryView from './components/HistoryView';
 import CognitiveMapView from './components/CognitiveMapView';
@@ -11,6 +11,9 @@ import SummaryGenerationInputView from './components/SummaryGenerationInputView'
 import SummaryCorrectionInputView from './components/SummaryCorrectionInputView';
 import SummaryGenerationResultsView from './components/SummaryGenerationResultsView';
 import SummaryCorrectionResultsView from './components/SummaryCorrectionResultsView';
+// IMPORTACIÓN COMPONENTES RED CONCEPTUAL
+import ConceptualNetworkInputView from './components/ConceptualNetworkInputView';
+import ConceptualNetworkView from './components/ConceptualNetworkView';
 
 import { BookOpen, ChevronLeft } from 'lucide-react';
 
@@ -30,6 +33,8 @@ const App: React.FC = () => {
   });
   
   const [resultado, setResultado] = useState<any>(null);
+  // Nuevo estado para el resultado de la red conceptual
+  const [networkResult, setNetworkResult] = useState<ConceptualNetworkResult | null>(null);
 
   useEffect(() => {
     fetch('/api/usuario')
@@ -78,9 +83,12 @@ const App: React.FC = () => {
 
   const handleViewHistoryItem = (item: HistoryEntry) => {
     setResultado(item.data);
-    // Determinamos a qué vista ir según el tipo de item en el historial
     if (item.type === 'SUMMARY_GEN') setState(AppState.SUMMARY_GENERATION_RESULTS);
     else if (item.type === 'SUMMARY_CORR') setState(AppState.SUMMARY_CORRECTION_RESULTS);
+    else if (item.type === 'NETWORK') {
+      setNetworkResult(item.data);
+      setResultado(null); // Limpiamos resultado general para usar el específico
+    }
     else setState(AppState.WRITING_CORRECTION_INPUT);
   };
 
@@ -101,9 +109,11 @@ const App: React.FC = () => {
       activityTitle: activityTitles[activityId] || 'Actividad'
     }));
 
-    // Si elige SUMMARY, vamos al selector de herramientas de resumen
     if (activityId === 'SUMMARY') {
       setState(AppState.SUMMARY_SELECTION);
+    } else if (activityId === 'NETWORK') {
+      setNetworkResult(null);
+      setState(AppState.TEXT_DISPLAY); // Reutilizamos TEXT_DISPLAY o creamos uno nuevo si lo prefieres
     } else {
       setState(AppState.WRITING_CORRECTION_INPUT);
     }
@@ -143,6 +153,29 @@ const App: React.FC = () => {
         saveToHistory('SUMMARY_CORR', 'Corrección de Resumen', data.resultado, data.resultado.grade);
         setState(AppState.SUMMARY_CORRECTION_RESULTS);
       } else alert(data.error);
+    } catch (e) { alert("Error de conexión"); }
+    finally { setLoading(false); }
+  };
+
+  // --- LÓGICA RED CONCEPTUAL ---
+  const handleGenerateNetwork = async (data: UniversityText) => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/generar_red', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          texto: data.content,
+          query: data.title,
+          materia: writingInput.materia
+        }),
+      });
+      const resData = await response.json();
+      if (response.ok) {
+        setNetworkResult(resData.resultado);
+        saveToHistory('NETWORK', data.title, resData.resultado);
+        setUserStats(prev => ({ ...prev, restantes: resData.restantes }));
+      } else alert(resData.error);
     } catch (e) { alert("Error de conexión"); }
     finally { setLoading(false); }
   };
@@ -200,7 +233,7 @@ const App: React.FC = () => {
         
         {state !== AppState.WELCOME && (
           <button 
-            onClick={() => { setResultado(null); setState(AppState.WELCOME); }}
+            onClick={() => { setResultado(null); setNetworkResult(null); setState(AppState.WELCOME); }}
             className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-all text-xs font-black uppercase tracking-widest"
           >
             <ChevronLeft size={16} strokeWidth={3} /> VOLVER
@@ -221,6 +254,21 @@ const App: React.FC = () => {
 
         {state === AppState.ACTIVITY_SELECTION && (
           <ActivitySelection onSelect={handleActivitySelect} />
+        )}
+
+        {/* --- RENDERING MÓDULO RED CONCEPTUAL --- */}
+        {state === AppState.TEXT_DISPLAY && !networkResult && (
+          <ConceptualNetworkInputView 
+            onBack={() => setState(AppState.ACTIVITY_SELECTION)}
+            onSubmit={handleGenerateNetwork}
+          />
+        )}
+
+        {networkResult && (
+          <ConceptualNetworkView 
+            result={networkResult}
+            onRestart={() => { setNetworkResult(null); setState(AppState.ACTIVITY_SELECTION); }}
+          />
         )}
 
         {/* --- RENDERING MÓDULO RESÚMENES --- */}
@@ -278,7 +326,14 @@ const App: React.FC = () => {
           />
         )}
 
-        {state === AppState.WRITING_CORRECTION_INPUT && !resultado && (
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            <p className="mt-4 text-slate-600 font-medium">Procesando material académico...</p>
+          </div>
+        )}
+
+        {state === AppState.WRITING_CORRECTION_INPUT && !resultado && !loading && (
           <DataEntryView 
             activityId={writingInput.activityType || ''}
             activityTitle={writingInput.activityTitle || ''}
@@ -325,4 +380,4 @@ const App: React.FC = () => {
 };
 
 export default App;
-                              
+                             
