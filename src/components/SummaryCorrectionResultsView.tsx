@@ -1,7 +1,7 @@
 // src/components/SummaryCorrectionResultsView.tsx
 import React from 'react';
 import { SummaryCorrectionResult } from '../types';
-import { CheckCircle2, AlertTriangle, XCircle, Star, RefreshCcw, ArrowRight } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, Star, RefreshCcw, ArrowRight, Lightbulb } from 'lucide-react';
 
 interface SummaryCorrectionResultsViewProps {
   result: SummaryCorrectionResult;
