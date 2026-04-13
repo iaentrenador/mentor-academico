@@ -13,8 +13,8 @@ const App: React.FC = () => {
   const [userStats, setUserStats] = useState({ logueado: false, restantes: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
-  // CORRECCIÓN: Se define activityTitle como string (no opcional) en la definición del estado
-  const [writingInput, setWritingInput] = useState<WritingCorrectionInput & { query?: string; profile?: string; activityTitle: string }>({
+  // CORRECCIÓN: Definimos un tipo local que garantiza que nada sea undefined para el renderizado
+  const [writingInput, setWritingInput] = useState<WritingCorrectionInput & { query: string; profile: string; activityTitle: string; activityType: string }>({
     writing: '',
     materia: 'higiene_upe',
     activityType: '',
@@ -99,12 +99,11 @@ const App: React.FC = () => {
   const handleDataSubmit = async (data: { text: string; query?: string; profile: string }) => {
     setLoading(true);
     
-    // Sincronizamos el estado local con lo que viene del formulario
     const payload = {
       ...writingInput,
       writing: data.text,
-      query: data.query,
-      materia: data.profile, // Usamos el ID del perfil como materia para el backend
+      query: data.query || '',
+      materia: data.profile, 
       profile: data.profile
     };
 
@@ -188,8 +187,9 @@ const App: React.FC = () => {
 
         {state === AppState.WRITING_CORRECTION_INPUT && !resultado && (
           <DataEntryView 
-            activityId={writingInput.activityType}
-            activityTitle={writingInput.activityTitle}
+            // CORRECCIÓN: Usamos fallbacks de string vacío para asegurar que nunca sea undefined
+            activityId={writingInput.activityType || ''}
+            activityTitle={writingInput.activityTitle || ''}
             onBack={() => setState(AppState.ACTIVITY_SELECTION)}
             onSubmit={handleDataSubmit}
             loading={loading}
@@ -233,4 +233,4 @@ const App: React.FC = () => {
 };
 
 export default App;
-  
+    
