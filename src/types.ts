@@ -6,6 +6,7 @@ export enum AppState {
   HISTORY = 'HISTORY',
   COGNITIVE_MAP = 'COGNITIVE_MAP',
   WRITING_CORRECTION_INPUT = 'WRITING_CORRECTION_INPUT',
+  WRITING_CORRECTION_RESULTS = 'WRITING_CORRECTION_RESULTS', // Nuevo: Para separar el resultado de la corrección
   ACTIVITY_SELECTION = 'ACTIVITY_SELECTION', 
   TEXT_DISPLAY = 'TEXT_DISPLAY',
   // Nuevos estados para el Módulo de Resúmenes
@@ -49,25 +50,47 @@ export interface UniversityText {
   sourceType: 'manual' | 'pdf' | 'web';
 }
 
-// 5. Inputs de Usuario (CORREGIDO: activityType y activityTitle son obligatorios)
+// 5. Inputs de Usuario (Actualizado para el nuevo flujo de 3 campos)
 export interface WritingCorrectionInput {
-  writing: string;
+  writing: string;       // El escrito del alumno
+  prompt: string;        // La consigna del profesor
+  sourceText?: string;   // El material de consulta (opcional)
   materia: string;
   activityType: string;  
   activityTitle: string; 
   query?: string;        
 }
 
-// 6. Resultados de la IA
+// 6. Resultados de la IA (Actualizado con Rúbrica y Debrief)
+export interface SectionEvaluation {
+  score: number;
+  feedback: string;
+}
+
 export interface WritingCorrectionResult {
-  grade: string | number;
+  grade: number;
+  status: string;
   performanceAnalysis: string;
-  strengths?: string[];
-  weaknesses?: string[];
+  strengths: string[];
+  weaknesses: string[];
+  improvementSuggestions: string[];
   improvedVersion?: string;
-  status?: string;
+  suggestedRetry?: string;
+  // Rúbrica detallada (opcional para el visualizador)
+  criteria?: {
+    understanding: SectionEvaluation;
+    promptAdequacy: SectionEvaluation;
+    coherence: SectionEvaluation;
+    vocabulary: SectionEvaluation;
+    fundamentation: SectionEvaluation;
+  };
+  // Resumen cualitativo extra
+  qualitative?: {
+    strengths: string[];
+    weaknesses: string[];
+    conceptualErrors: string[];
+  };
   rapLyrics?: string;    
-  conceptualMap?: any;   
 }
 
 // 6.1 Interfaz para el resultado de Generación Automática de Resúmenes
