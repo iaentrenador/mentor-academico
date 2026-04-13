@@ -13,8 +13,8 @@ const App: React.FC = () => {
   const [userStats, setUserStats] = useState({ logueado: false, restantes: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
-  // CORRECCIÓN: Se agrega activityTitle al tipo y al estado inicial
-  const [writingInput, setWritingInput] = useState<WritingCorrectionInput & { query?: string; profile?: string; activityTitle?: string }>({
+  // CORRECCIÓN: Se define activityTitle como string obligatorio en la intersección del tipo
+  const [writingInput, setWritingInput] = useState<WritingCorrectionInput & { query?: string; profile?: string; activityTitle: string }>({
     writing: '',
     materia: 'higiene_upe',
     activityType: '',
@@ -186,19 +186,16 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* REEMPLAZO: Ahora usamos DataEntryView en lugar del textarea genérico */}
         {state === AppState.WRITING_CORRECTION_INPUT && !resultado && (
           <DataEntryView 
             activityId={writingInput.activityType}
-            // CORRECCIÓN: Se agrega el fallback "|| ''" para asegurar un string
-            activityTitle={(writingInput as any).activityTitle || ''}
+            activityTitle={writingInput.activityTitle}
             onBack={() => setState(AppState.ACTIVITY_SELECTION)}
             onSubmit={handleDataSubmit}
             loading={loading}
           />
         )}
 
-        {/* Vista de Resultados (Se mantiene igual, pero ahora recibe datos más ricos) */}
         {resultado && state === AppState.WRITING_CORRECTION_INPUT && (
            <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
             <div className="bg-indigo-600 p-8 text-white flex justify-between items-center">
@@ -217,7 +214,6 @@ const App: React.FC = () => {
             <div className="p-8 space-y-6 overflow-y-auto max-h-[60vh]">
                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 prose prose-indigo max-w-none">
                   <h4 className="font-black text-slate-800 mb-3 uppercase text-xs tracking-widest">Respuesta del Mentor</h4>
-                  {/* Aquí podríamos estructurar según si es EXPLAINER o no */}
                   <p className="text-slate-600 leading-relaxed font-medium whitespace-pre-wrap">
                     {resultado.explanation || resultado.performanceAnalysis}
                   </p>
@@ -237,4 +233,4 @@ const App: React.FC = () => {
 };
 
 export default App;
-                                       
+      
