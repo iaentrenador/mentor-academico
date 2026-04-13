@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData } from './types';
+import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData, SummaryGenerationResult, SummaryCorrectionResult } from './types';
 import Welcome from './components/Welcome'; 
 import HistoryView from './components/HistoryView';
 import CognitiveMapView from './components/CognitiveMapView';
 import ActivitySelection from './components/ActivitySelection'; 
-import DataEntryView from './components/DataEntryView'; // IMPORTADO EL NUEVO COMPONENTE
+import DataEntryView from './components/DataEntryView';
+// IMPORTACIÓN DE NUEVOS COMPONENTES
+import SummaryToolSelection from './components/SummaryToolSelection';
+import SummaryGenerationInputView from './components/SummaryGenerationInputView';
+import SummaryCorrectionInputView from './components/SummaryCorrectionInputView';
+import SummaryGenerationResultsView from './components/SummaryGenerationResultsView';
+import SummaryCorrectionResultsView from './components/SummaryCorrectionResultsView';
+
 import { BookOpen, ChevronLeft } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -13,7 +20,6 @@ const App: React.FC = () => {
   const [userStats, setUserStats] = useState({ logueado: false, restantes: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
-  // CORRECCIÓN: Definimos un tipo local que garantiza que nada sea undefined para el renderizado
   const [writingInput, setWritingInput] = useState<WritingCorrectionInput & { query: string; profile: string; activityTitle: string; activityType: string }>({
     writing: '',
     materia: 'higiene_upe',
@@ -72,10 +78,12 @@ const App: React.FC = () => {
 
   const handleViewHistoryItem = (item: HistoryEntry) => {
     setResultado(item.data);
-    setState(AppState.WRITING_CORRECTION_INPUT);
+    // Determinamos a qué vista ir según el tipo de item en el historial
+    if (item.type === 'SUMMARY_GEN') setState(AppState.SUMMARY_GENERATION_RESULTS);
+    else if (item.type === 'SUMMARY_CORR') setState(AppState.SUMMARY_CORRECTION_RESULTS);
+    else setState(AppState.WRITING_CORRECTION_INPUT);
   };
 
-  // 1. Maneja la selección de la tarjeta
   const handleActivitySelect = (activityId: string) => {
     const activityTitles: Record<string, string> = {
       EXPLAINER: 'Explicador de Conceptos',
@@ -92,10 +100,55 @@ const App: React.FC = () => {
       activityType: activityId,
       activityTitle: activityTitles[activityId] || 'Actividad'
     }));
-    setState(AppState.WRITING_CORRECTION_INPUT);
+
+    // Si elige SUMMARY, vamos al selector de herramientas de resumen
+    if (activityId === 'SUMMARY') {
+      setState(AppState.SUMMARY_SELECTION);
+    } else {
+      setState(AppState.WRITING_CORRECTION_INPUT);
+    }
   };
 
-  // 2. Maneja el envío desde DataEntryView
+  // --- LÓGICA ESPECÍFICA PARA RESÚMENES ---
+
+  const handleSummaryGeneration = async (title: string, content: string) => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/generar_resumen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setResultado(data.resultado);
+        saveToHistory('SUMMARY_GEN', title, data.resultado);
+        setState(AppState.SUMMARY_GENERATION_RESULTS);
+      } else alert(data.error);
+    } catch (e) { alert("Error de conexión"); }
+    finally { setLoading(false); }
+  };
+
+  const handleSummaryCorrection = async (sourceText: string, userSummary: string) => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/corregir_resumen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceText, userSummary })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setResultado(data.resultado);
+        saveToHistory('SUMMARY_CORR', 'Corrección de Resumen', data.resultado, data.resultado.grade);
+        setState(AppState.SUMMARY_CORRECTION_RESULTS);
+      } else alert(data.error);
+    } catch (e) { alert("Error de conexión"); }
+    finally { setLoading(false); }
+  };
+
+  // --- FIN LÓGICA RESÚMENES ---
+
   const handleDataSubmit = async (data: { text: string; query?: string; profile: string }) => {
     setLoading(true);
     
@@ -170,6 +223,46 @@ const App: React.FC = () => {
           <ActivitySelection onSelect={handleActivitySelect} />
         )}
 
+        {/* --- RENDERING MÓDULO RESÚMENES --- */}
+        {state === AppState.SUMMARY_SELECTION && (
+          <SummaryToolSelection 
+            onBack={() => setState(AppState.ACTIVITY_SELECTION)}
+            onStartAutomatic={() => setState(AppState.SUMMARY_GENERATION_INPUT)}
+            onStartCorrection={() => setState(AppState.SUMMARY_CORRECTION_INPUT)}
+          />
+        )}
+
+        {state === AppState.SUMMARY_GENERATION_INPUT && (
+          <SummaryGenerationInputView 
+            onBack={() => setState(AppState.SUMMARY_SELECTION)}
+            onSubmit={handleSummaryGeneration}
+            loading={loading}
+          />
+        )}
+
+        {state === AppState.SUMMARY_CORRECTION_INPUT && (
+          <SummaryCorrectionInputView 
+            onBack={() => setState(AppState.SUMMARY_SELECTION)}
+            onSubmit={handleSummaryCorrection}
+            loading={loading}
+          />
+        )}
+
+        {state === AppState.SUMMARY_GENERATION_RESULTS && resultado && (
+          <SummaryGenerationResultsView 
+            result={resultado}
+            onRestart={() => { setResultado(null); setState(AppState.SUMMARY_SELECTION); }}
+          />
+        )}
+
+        {state === AppState.SUMMARY_CORRECTION_RESULTS && resultado && (
+          <SummaryCorrectionResultsView 
+            result={resultado}
+            onRestart={() => { setResultado(null); setState(AppState.SUMMARY_SELECTION); }}
+          />
+        )}
+        {/* --- FIN RENDERING MÓDULO RESÚMENES --- */}
+
         {state === AppState.HISTORY && (
           <HistoryView 
             history={history} 
@@ -187,7 +280,6 @@ const App: React.FC = () => {
 
         {state === AppState.WRITING_CORRECTION_INPUT && !resultado && (
           <DataEntryView 
-            // CORRECCIÓN: Usamos fallbacks de string vacío para asegurar que nunca sea undefined
             activityId={writingInput.activityType || ''}
             activityTitle={writingInput.activityTitle || ''}
             onBack={() => setState(AppState.ACTIVITY_SELECTION)}
@@ -233,4 +325,4 @@ const App: React.FC = () => {
 };
 
 export default App;
-    
+                              
