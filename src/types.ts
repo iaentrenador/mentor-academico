@@ -7,7 +7,13 @@ export enum AppState {
   COGNITIVE_MAP = 'COGNITIVE_MAP',
   WRITING_CORRECTION_INPUT = 'WRITING_CORRECTION_INPUT',
   ACTIVITY_SELECTION = 'ACTIVITY_SELECTION', 
-  TEXT_DISPLAY = 'TEXT_DISPLAY'               
+  TEXT_DISPLAY = 'TEXT_DISPLAY',
+  // Nuevos estados para el Módulo de Resúmenes
+  SUMMARY_SELECTION = 'SUMMARY_SELECTION',
+  SUMMARY_GENERATION_INPUT = 'SUMMARY_GENERATION_INPUT',
+  SUMMARY_CORRECTION_INPUT = 'SUMMARY_CORRECTION_INPUT',
+  SUMMARY_GENERATION_RESULTS = 'SUMMARY_GENERATION_RESULTS',
+  SUMMARY_CORRECTION_RESULTS = 'SUMMARY_CORRECTION_RESULTS'
 }
 
 // 2. Definición del Historial
@@ -47,9 +53,9 @@ export interface UniversityText {
 export interface WritingCorrectionInput {
   writing: string;
   materia: string;
-  activityType: string;  // Eliminado el ? para evitar errores de undefined
-  activityTitle: string; // Agregado como obligatorio para el componente DataEntryView
-  query?: string;        // Se mantiene opcional porque no todas las tareas lo usan
+  activityType: string;  
+  activityTitle: string; 
+  query?: string;        
 }
 
 // 6. Resultados de la IA
@@ -62,6 +68,27 @@ export interface WritingCorrectionResult {
   status?: string;
   rapLyrics?: string;    
   conceptualMap?: any;   
+}
+
+// 6.1 Interfaz para el resultado de Generación Automática de Resúmenes
+export interface SummaryGenerationResult {
+  title: string;
+  executiveSummary: string;
+  keyConcepts: { concept: string; definition: string }[];
+  conclusions: string;
+}
+
+// 6.2 Interfaz para el resultado de Corrección de Resúmenes
+export interface SummaryCorrectionResult {
+  grade: number;
+  status: 'Excelente' | 'Satisfactorio' | 'Insuficiente';
+  performanceAnalysis: string;
+  strengths: string[];
+  weaknesses: string[];
+  omissions: string[];
+  improvementSuggestions: string[];
+  suggestedRetry: string;
+  improvedVersion: string;
 }
 
 // 7. Estado General
