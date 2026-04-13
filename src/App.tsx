@@ -13,13 +13,14 @@ const App: React.FC = () => {
   const [userStats, setUserStats] = useState({ logueado: false, restantes: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
-  // Ajustado para manejar el perfil y la duda específica (query)
-  const [writingInput, setWritingInput] = useState<WritingCorrectionInput & { query?: string; profile?: string }>({
+  // CORRECCIÓN: Se agrega activityTitle al tipo y al estado inicial
+  const [writingInput, setWritingInput] = useState<WritingCorrectionInput & { query?: string; profile?: string; activityTitle?: string }>({
     writing: '',
     materia: 'higiene_upe',
     activityType: '',
     query: '',
-    profile: 'higiene_upe'
+    profile: 'higiene_upe',
+    activityTitle: '' 
   });
   
   const [resultado, setResultado] = useState<any>(null);
@@ -189,7 +190,8 @@ const App: React.FC = () => {
         {state === AppState.WRITING_CORRECTION_INPUT && !resultado && (
           <DataEntryView 
             activityId={writingInput.activityType}
-            activityTitle={(writingInput as any).activityTitle}
+            // CORRECCIÓN: Se agrega el fallback "|| ''" para asegurar un string
+            activityTitle={(writingInput as any).activityTitle || ''}
             onBack={() => setState(AppState.ACTIVITY_SELECTION)}
             onSubmit={handleDataSubmit}
             loading={loading}
@@ -235,4 +237,4 @@ const App: React.FC = () => {
 };
 
 export default App;
-          
+                                       
