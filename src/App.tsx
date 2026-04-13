@@ -13,7 +13,7 @@ const App: React.FC = () => {
   const [userStats, setUserStats] = useState({ logueado: false, restantes: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
-  // CORRECCIÓN: Se define activityTitle como string obligatorio en la intersección del tipo
+  // CORRECCIÓN: Se define activityTitle como string (no opcional) en la definición del estado
   const [writingInput, setWritingInput] = useState<WritingCorrectionInput & { query?: string; profile?: string; activityTitle: string }>({
     writing: '',
     materia: 'higiene_upe',
@@ -233,4 +233,4 @@ const App: React.FC = () => {
 };
 
 export default App;
-      
+  
