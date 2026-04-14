@@ -6,10 +6,10 @@ export enum AppState {
   HISTORY = 'HISTORY',
   COGNITIVE_MAP = 'COGNITIVE_MAP',
   WRITING_CORRECTION_INPUT = 'WRITING_CORRECTION_INPUT',
-  WRITING_CORRECTION_RESULTS = 'WRITING_CORRECTION_RESULTS', // Nuevo: Para separar el resultado de la corrección
+  WRITING_CORRECTION_RESULTS = 'WRITING_CORRECTION_RESULTS', 
   ACTIVITY_SELECTION = 'ACTIVITY_SELECTION', 
   TEXT_DISPLAY = 'TEXT_DISPLAY',
-  // Nuevos estados para el Módulo de Resúmenes
+  // Estados para el Módulo de Resúmenes
   SUMMARY_SELECTION = 'SUMMARY_SELECTION',
   SUMMARY_GENERATION_INPUT = 'SUMMARY_GENERATION_INPUT',
   SUMMARY_CORRECTION_INPUT = 'SUMMARY_CORRECTION_INPUT',
@@ -41,27 +41,27 @@ export interface CognitiveMapData {
   activityDistribution?: any;
 }
 
-// 4. NUEVO: Estructura de Texto Universitario
+// 4. Estructura de Texto Universitario
 export interface UniversityText {
   id?: string;
   title: string;
   content: string;
   materia: string;
-  sourceType: 'manual' | 'pdf' | 'web';
+  sourceType: 'pdf' | 'web'; // Eliminado 'manual'
 }
 
-// 5. Inputs de Usuario (Actualizado para el nuevo flujo de 3 campos)
+// 5. Inputs de Usuario
 export interface WritingCorrectionInput {
-  writing: string;       // El escrito del alumno
-  prompt: string;        // La consigna del profesor
-  sourceText?: string;   // El material de consulta (opcional)
+  writing: string;       
+  prompt: string;        
+  sourceText?: string;   
   materia: string;
   activityType: string;  
   activityTitle: string; 
   query?: string;        
 }
 
-// 6. Resultados de la IA (Actualizado con Rúbrica y Debrief)
+// 6. Resultados de la IA
 export interface SectionEvaluation {
   score: number;
   feedback: string;
@@ -76,7 +76,6 @@ export interface WritingCorrectionResult {
   improvementSuggestions: string[];
   improvedVersion?: string;
   suggestedRetry?: string;
-  // Rúbrica detallada (opcional para el visualizador)
   criteria?: {
     understanding: SectionEvaluation;
     promptAdequacy: SectionEvaluation;
@@ -84,13 +83,12 @@ export interface WritingCorrectionResult {
     vocabulary: SectionEvaluation;
     fundamentation: SectionEvaluation;
   };
-  // Resumen cualitativo extra
   qualitative?: {
     strengths: string[];
     weaknesses: string[];
     conceptualErrors: string[];
   };
-  rapLyrics?: string;    
+  // Eliminado rapLyrics
 }
 
 // 6.1 Interfaz para el resultado de Generación Automática de Resúmenes
@@ -114,7 +112,7 @@ export interface SummaryCorrectionResult {
   improvedVersion: string;
 }
 
-// 6.3 Interfaz para el resultado de Red Conceptual (NUEVO)
+// 6.3 Interfaz para el resultado de Red Conceptual
 export interface ConceptualNode {
   id: string;
   label: string;
