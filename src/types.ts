@@ -53,7 +53,7 @@ export interface UniversityText {
   title: string;
   content: string;
   materia: string;
-  sourceType: 'manual' | 'pdf' | 'web'; // Restaurado 'manual' para evitar errores de compilación
+  sourceType: 'manual' | 'pdf' | 'web'; 
 }
 
 // 5. Inputs de Usuario
@@ -165,7 +165,7 @@ export interface MathCorrectionInput {
 
 export interface MathCorrectionResult {
   grade: number;
-  status: 'Aprobado' | 'Aprobado con observaciones' | 'No aprobado';
+  status: 'Excelente' | 'Satisfactorio' | 'Insuficiente' | 'Aprobado' | 'No aprobado';
   performanceAnalysis: string;
   stepByStepCorrection: {
     step: string;
