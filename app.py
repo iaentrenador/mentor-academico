@@ -191,8 +191,37 @@ REGLAS: Solo un nodo 'core'. Nodos 'main' derivan del core. 'secondary' son deta
         response_format = {"type": "json_object"}
 
     elif tarea == "generar_examen":
-        prompt_sistema = f"""{perfil_materia}\nResponde ESTRICTAMENTE con JSON: {{"title": "...", "questions": []}}"""
-        content = f"MATERIAL: {material if material else texto}"
+        prompt_sistema = f"""{perfil_materia}
+Eres un profesor universitario. Genera un examen riguroso basado en el material.
+Responde ESTRICTAMENTE con este JSON:
+{{
+  "questions": [
+    {{
+      "id": "1",
+      "question": "...",
+      "type": "multiple-choice/development/justification",
+      "options": ["opcion A", "opcion B", "opcion C", "opcion D"]
+    }}
+  ]
+}}"""
+        content = f"MATERIAL DE ESTUDIO: {material if material else texto}\nTIPOS PEDIDOS: {consigna}\nCANTIDAD: {query}"
+        response_format = {"type": "json_object"}
+
+    elif tarea == "evaluar_simulacro":
+        prompt_sistema = f"""{perfil_materia}
+Evalúa las respuestas del alumno al examen generado. Responde ESTRICTAMENTE con este JSON:
+{{
+  "grade": 0-10,
+  "status": "Aprobado/Aprobado con observaciones/No aprobado",
+  "totalScore": 0,
+  "maxScore": 0,
+  "performanceAnalysis": "...",
+  "suggestedRetry": "...",
+  "questionEvaluations": [
+    {{"questionId": "...", "isCorrect": true, "score": 0, "feedback": "..."}}
+  ]
+}}"""
+        content = f"MATERIAL ORIGINAL: {material}\nRESPUESTAS DEL ALUMNO: {texto}"
         response_format = {"type": "json_object"}
 
     elif tarea == "generar_rap":
@@ -254,6 +283,32 @@ Analiza el procedimiento, no solo el resultado. Responde ESTRICTAMENTE con este 
         return None
 
 # --- RUTAS DE API ---
+
+@app.route("/api/exam/generate", methods=["POST"])
+def api_generate_exam():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    data = request.json
+    res = ejecutar_tarea_ia("generar_examen", data.get("material", ""), "", u, 
+                            materia=data.get("materia", "general"),
+                            consigna=json.dumps(data.get("questionTypes")),
+                            query=str(data.get("questionCount")))
+    if not res: return jsonify({"error": "Error IA"}), 500
+    u.consultas_usadas += 1
+    db.session.commit()
+    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
+
+@app.route("/api/exam/evaluate", methods=["POST"])
+def api_evaluate_exam():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    data = request.json
+    res = ejecutar_tarea_ia("evaluar_simulacro", json.dumps(data.get("answers")), data.get("material", ""), u)
+    if not res: return jsonify({"error": "Error IA"}), 500
+    u.consultas_usadas += 1
+    db.session.commit()
+    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
+
 @app.route("/api/math/explain", methods=["POST"])
 def api_math_explain():
     u = get_usuario_actual()
