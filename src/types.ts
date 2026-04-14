@@ -47,7 +47,7 @@ export interface UniversityText {
   title: string;
   content: string;
   materia: string;
-  sourceType: 'pdf' | 'web'; // Eliminado 'manual'
+  sourceType: 'manual' | 'pdf' | 'web'; // Restaurado 'manual' para evitar errores de compilación
 }
 
 // 5. Inputs de Usuario
@@ -88,7 +88,6 @@ export interface WritingCorrectionResult {
     weaknesses: string[];
     conceptualErrors: string[];
   };
-  // Eliminado rapLyrics
 }
 
 // 6.1 Interfaz para el resultado de Generación Automática de Resúmenes
