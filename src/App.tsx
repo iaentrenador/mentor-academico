@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData, ConceptualNetworkResult, UniversityText } from './types';
+import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData, ConceptualNetworkResult, UniversityText, MathExplainerInput, MathCorrectionInput } from './types';
 import Welcome from './components/Welcome'; 
 import HistoryView from './components/HistoryView';
 import CognitiveMapView from './components/CognitiveMapView';
@@ -18,10 +18,25 @@ import ConceptualNetworkView from './components/ConceptualNetworkView';
 import WritingCorrectionForm from './components/WritingCorrectionForm';
 import CorrectionResultsView from './components/CorrectionResultsView';
 
+// --- IMPORTACIÓN MÓDULO MATEMÁTICAS ---
+import MathExplainerForm from './components/math/MathExplainerForm';
+import MathExplainerResults from './components/math/MathExplainerResults';
+import MathCorrectionForm from './components/math/MathCorrectionForm';
+import MathCorrectionResults from './components/math/MathCorrectionResults';
+
 import { BookOpen, ChevronLeft } from 'lucide-react';
 
+// Extendemos el AppState si no está extendido en tus types
+enum MathAppState {
+  MATH_EXPLAINER_INPUT = 'MATH_EXPLAINER_INPUT',
+  MATH_EXPLAINER_RESULTS = 'MATH_EXPLAINER_RESULTS',
+  MATH_CORRECTION_INPUT = 'MATH_CORRECTION_INPUT',
+  MATH_CORRECTION_RESULTS = 'MATH_CORRECTION_RESULTS'
+}
+
 const App: React.FC = () => {
-  const [state, setState] = useState<AppState>(AppState.WELCOME);
+  // Combinamos los AppState para el manejo interno
+  const [state, setState] = useState<AppState | MathAppState | string>(AppState.WELCOME);
   const [loading, setLoading] = useState(false);
   const [userStats, setUserStats] = useState({ logueado: false, restantes: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -88,6 +103,8 @@ const App: React.FC = () => {
     if (item.type === 'SUMMARY_GEN') setState(AppState.SUMMARY_GENERATION_RESULTS);
     else if (item.type === 'SUMMARY_CORR') setState(AppState.SUMMARY_CORRECTION_RESULTS);
     else if (item.type === 'WRITING_CORR') setState(AppState.WRITING_CORRECTION_RESULTS);
+    else if (item.type === 'MATH_EXP') setState(MathAppState.MATH_EXPLAINER_RESULTS);
+    else if (item.type === 'MATH_CORR') setState(MathAppState.MATH_CORRECTION_RESULTS);
     else if (item.type === 'NETWORK') {
       setNetworkResult(item.data);
       setResultado(null);
@@ -113,10 +130,52 @@ const App: React.FC = () => {
     } else if (activityId === 'CORRECTION') {
       setWritingInput(prev => ({ ...prev, activityType: 'CORRECTION', activityTitle: activityTitles[activityId] }));
       setState(AppState.WRITING_CORRECTION_INPUT);
+    } else if (activityId === 'MATH') {
+      // Por defecto al entrar a matemáticas vamos al Explicador
+      setState(MathAppState.MATH_EXPLAINER_INPUT);
     } else {
       setWritingInput(prev => ({ ...prev, activityType: activityId, activityTitle: activityTitles[activityId] }));
       setState(AppState.WRITING_CORRECTION_INPUT);
     }
+  };
+
+  // --- HANDLERS MATEMÁTICOS ---
+  const handleMathExplain = async (input: MathExplainerInput) => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/math/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input)
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setResultado(data.resultado);
+        setUserStats(prev => ({ ...prev, restantes: data.restantes }));
+        saveToHistory('MATH_EXP', `Matemáticas: ${input.topic}`, data.resultado);
+        setState(MathAppState.MATH_EXPLAINER_RESULTS);
+      } else alert(data.error);
+    } catch (e) { alert("Error de conexión"); }
+    finally { setLoading(false); }
+  };
+
+  const handleMathCorrection = async (input: MathCorrectionInput) => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/math/correct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input)
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setResultado(data.resultado);
+        setUserStats(prev => ({ ...prev, restantes: data.restantes }));
+        saveToHistory('MATH_CORR', 'Corrección Matemáticas', data.resultado, data.resultado.grade);
+        setState(MathAppState.MATH_CORRECTION_RESULTS);
+      } else alert(data.error);
+    } catch (e) { alert("Error de conexión"); }
+    finally { setLoading(false); }
   };
 
   const handleWritingCorrection = async (input: WritingCorrectionInput) => {
@@ -250,6 +309,38 @@ const App: React.FC = () => {
           <ActivitySelection onSelect={handleActivitySelect} />
         )}
 
+        {/* --- RENDERIZADO DE MATEMÁTICAS --- */}
+        {state === MathAppState.MATH_EXPLAINER_INPUT && (
+          <MathExplainerForm 
+            onBack={() => setState(AppState.ACTIVITY_SELECTION)}
+            onSubmit={handleMathExplain}
+            onGoToCorrection={() => setState(MathAppState.MATH_CORRECTION_INPUT)}
+          />
+        )}
+
+        {state === MathAppState.MATH_EXPLAINER_RESULTS && resultado && (
+          <MathExplainerResults 
+            result={resultado}
+            onBack={() => setState(MathAppState.MATH_EXPLAINER_INPUT)}
+          />
+        )}
+
+        {state === MathAppState.MATH_CORRECTION_INPUT && (
+          <MathCorrectionForm 
+            onBack={() => setState(MathAppState.MATH_EXPLAINER_INPUT)}
+            onSubmit={handleMathCorrection}
+          />
+        )}
+
+        {state === MathAppState.MATH_CORRECTION_RESULTS && resultado && (
+          <MathCorrectionResults 
+            result={resultado}
+            onRestart={() => setState(AppState.ACTIVITY_SELECTION)}
+            onRetry={() => setState(MathAppState.MATH_CORRECTION_INPUT)}
+          />
+        )}
+        {/* --- FIN RENDERIZADO DE MATEMÁTICAS --- */}
+
         {state === AppState.WRITING_CORRECTION_INPUT && writingInput.activityType === 'CORRECTION' && (
           <WritingCorrectionForm 
             isLoading={loading}
@@ -365,4 +456,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-        
