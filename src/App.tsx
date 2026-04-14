@@ -322,6 +322,8 @@ const App: React.FC = () => {
           <MathExplainerResults 
             result={resultado}
             onBack={() => setState(MathAppState.MATH_EXPLAINER_INPUT)}
+            onRetry={() => setState(MathAppState.MATH_EXPLAINER_INPUT)}
+            onRestart={() => setState(AppState.WELCOME)}
           />
         )}
 
@@ -456,3 +458,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+        
