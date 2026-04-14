@@ -1,26 +1,36 @@
 import React from 'react';
 import { MathExplainerResult } from '../../types';
-import { Lightbulb, BookOpen, Zap, ArrowRight, RotateCcw, Home } from 'lucide-react';
+import { Lightbulb, BookOpen, Zap, ArrowRight, RotateCcw, Home, ChevronLeft } from 'lucide-react';
 
 interface MathExplainerResultsProps {
   result: MathExplainerResult;
   onRestart: () => void;
   onRetry: () => void;
+  onBack: () => void; // Propiedad agregada para corregir el error de TS
 }
 
-const MathExplainerResults: React.FC<MathExplainerResultsProps> = ({ result, onRestart, onRetry }) => {
+const MathExplainerResults: React.FC<MathExplainerResultsProps> = ({ result, onRestart, onRetry, onBack }) => {
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 max-w-4xl mx-auto p-4">
       <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
         {/* Encabezado de Resultados */}
-        <div className="flex items-center gap-4 border-b border-slate-100 pb-6">
-          <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
-            <Lightbulb className="w-6 h-6" />
+        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+              <Lightbulb className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-slate-800">Explicación del Método</h3>
+              <p className="text-slate-500 text-sm font-medium">Conceptos clave y ejercicio guía.</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-2xl font-bold text-slate-800">Explicación del Método</h3>
-            <p className="text-slate-500 text-sm font-medium">Conceptos clave y ejercicio guía.</p>
-          </div>
+          <button 
+            onClick={onBack}
+            className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+            title="Volver"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
         </div>
 
         {/* Marco Teórico */}
