@@ -11,10 +11,16 @@ interface MathCorrectionResultsProps {
 const MathCorrectionResults: React.FC<MathCorrectionResultsProps> = ({ result, onRestart, onRetry }) => {
   const getStatusColor = () => {
     switch (result.status) {
-      case 'Aprobado': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
-      case 'Aprobado con observaciones': return 'text-amber-600 bg-amber-50 border-amber-200';
-      case 'No aprobado': return 'text-rose-600 bg-rose-50 border-rose-200';
-      default: return 'text-slate-600 bg-slate-50 border-slate-200';
+      case 'Excelente':
+      case 'Aprobado': 
+        return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+      case 'Satisfactorio': 
+        return 'text-amber-600 bg-amber-50 border-amber-200';
+      case 'Insuficiente':
+      case 'No aprobado': 
+        return 'text-rose-600 bg-rose-50 border-rose-200';
+      default: 
+        return 'text-slate-600 bg-slate-50 border-slate-200';
     }
   };
 
