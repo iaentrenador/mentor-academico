@@ -4,12 +4,8 @@ import {
   AlignLeft, 
   Share2, 
   FileCheck, 
-  Mic2, 
   Binary, 
-  ClipboardCheck, 
-  Zap, 
-  Globe, 
-  Type 
+  ClipboardCheck
 } from 'lucide-react';
 
 interface Activity {
@@ -30,12 +26,8 @@ const activities: Activity[] = [
   { id: 'SUMMARY', title: 'Gestión de Resúmenes', description: 'Genera o corrige resúmenes profesionales.', icon: <AlignLeft />, color: 'text-emerald-600 bg-emerald-50' },
   { id: 'NETWORK', title: 'Red Conceptual', description: 'Visualiza relaciones jerárquicas al instante.', icon: <Share2 />, color: 'text-indigo-600 bg-indigo-50' },
   { id: 'CORRECTION', title: 'Corregir Escrito', description: 'Evaluación de ensayos con rigor académico.', icon: <FileCheck />, color: 'text-rose-600 bg-rose-50' },
-  { id: 'RAP', title: 'Rap Técnico Académico', description: 'Mnemotecnia auditiva: rimas memorables.', icon: <Mic2 />, color: 'text-slate-900 bg-slate-100' },
   { id: 'MATH', title: 'Módulo de Matemáticas', description: 'Corrección y explicaciones de ejercicios.', icon: <Binary />, color: 'text-cyan-600 bg-cyan-50' },
   { id: 'EXAM', title: 'Examen Parcial', description: 'Simulacro personalizado (Choice/Desarrollo).', icon: <ClipboardCheck />, color: 'text-purple-600 bg-purple-50' },
-  { id: 'MASTER', title: 'Sintetizador Maestro', description: 'Resumen y Red en un solo paso.', icon: <Zap />, color: 'text-orange-600 bg-orange-50', badge: 'NUEVO' },
-  { id: 'CHALLENGE', title: 'Desafío Aleatorio', description: 'Investigación web y texto complejo original.', icon: <Globe />, color: 'text-sky-600 bg-sky-50' },
-  { id: 'MANUAL', title: 'Pegar Texto Manual', description: 'Analiza contenido del portapapeles.', icon: <Type />, color: 'text-slate-600 bg-slate-100' },
 ];
 
 const ActivitySelection: React.FC<ActivitySelectionProps> = ({ onSelect }) => {
@@ -81,4 +73,3 @@ const ActivitySelection: React.FC<ActivitySelectionProps> = ({ onSelect }) => {
 };
 
 export default ActivitySelection;
-            
