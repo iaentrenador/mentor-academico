@@ -14,7 +14,13 @@ export enum AppState {
   SUMMARY_GENERATION_INPUT = 'SUMMARY_GENERATION_INPUT',
   SUMMARY_CORRECTION_INPUT = 'SUMMARY_CORRECTION_INPUT',
   SUMMARY_GENERATION_RESULTS = 'SUMMARY_GENERATION_RESULTS',
-  SUMMARY_CORRECTION_RESULTS = 'SUMMARY_CORRECTION_RESULTS'
+  SUMMARY_CORRECTION_RESULTS = 'SUMMARY_CORRECTION_RESULTS',
+  // --- NUEVOS ESTADOS MÓDULO MATEMÁTICAS ---
+  MATH_SELECTION = 'MATH_SELECTION',
+  MATH_EXPLAINER_INPUT = 'MATH_EXPLAINER_INPUT',
+  MATH_EXPLAINER_RESULTS = 'MATH_EXPLAINER_RESULTS',
+  MATH_CORRECTION_INPUT = 'MATH_CORRECTION_INPUT',
+  MATH_CORRECTION_RESULTS = 'MATH_CORRECTION_RESULTS'
 }
 
 // 2. Definición del Historial
@@ -129,6 +135,47 @@ export interface ConceptualNetworkResult {
   summary: string;
   nodes: ConceptualNode[];
   edges: ConceptualEdge[];
+}
+
+// --- 6.4 INTERFACES MÓDULO MATEMÁTICAS ---
+
+export interface MathExplainerInput {
+  topic: string;
+  specificExercise: string;
+}
+
+export interface MathExplainerResult {
+  theoreticalContext: string;
+  similarExample: {
+    problem: string;
+    solutionSteps: string[];
+    finalResult: string;
+    explanation: string;
+  };
+  keyFormulas: string[];
+  tips: string[];
+}
+
+export interface MathCorrectionInput {
+  exercisePrompt: string;
+  studentAnswer: string;
+  referenceMaterial?: string;
+  referenceFile?: { base64: string; mimeType: string };
+}
+
+export interface MathCorrectionResult {
+  grade: number;
+  status: 'Aprobado' | 'Aprobado con observaciones' | 'No aprobado';
+  performanceAnalysis: string;
+  stepByStepCorrection: {
+    step: string;
+    isCorrect: boolean;
+    feedback: string;
+    correction?: string;
+  }[];
+  conceptualErrors: string[];
+  finalVerdict: string;
+  improvementSuggestions: string[];
 }
 
 // 7. Estado General
