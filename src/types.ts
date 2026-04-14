@@ -20,7 +20,11 @@ export enum AppState {
   MATH_EXPLAINER_INPUT = 'MATH_EXPLAINER_INPUT',
   MATH_EXPLAINER_RESULTS = 'MATH_EXPLAINER_RESULTS',
   MATH_CORRECTION_INPUT = 'MATH_CORRECTION_INPUT',
-  MATH_CORRECTION_RESULTS = 'MATH_CORRECTION_RESULTS'
+  MATH_CORRECTION_RESULTS = 'MATH_CORRECTION_RESULTS',
+  // --- NUEVOS ESTADOS SIMULACRO DE EXAMEN ---
+  EXAM_INPUT = 'EXAM_INPUT',
+  EXAM_TAKING = 'EXAM_TAKING',
+  EXAM_RESULTS = 'EXAM_RESULTS'
 }
 
 // 2. Definición del Historial
@@ -176,6 +180,36 @@ export interface MathCorrectionResult {
   conceptualErrors: string[];
   finalVerdict: string;
   improvementSuggestions: string[];
+}
+
+// --- 6.5 INTERFACES SIMULACRO DE EXAMEN ---
+
+export type ExamQuestionType = 'multiple-choice' | 'development' | 'justification';
+
+export interface ExamQuestion {
+  id: string;
+  question: string;
+  type: ExamQuestionType;
+  options?: string[]; 
+}
+
+export interface ExamData {
+  questions: ExamQuestion[];
+}
+
+export interface ExamEvaluation {
+  grade: number;
+  status: string;
+  totalScore: number;
+  maxScore: number;
+  performanceAnalysis: string;
+  suggestedRetry: string;
+  questionEvaluations: {
+    questionId: string;
+    isCorrect: boolean;
+    score: number;
+    feedback: string;
+  }[];
 }
 
 // 7. Estado General
