@@ -67,7 +67,7 @@ TAREAS_VALIDAS = {
     "explicar", "resumir", "evaluar", "cargar_material",
     "preparar_oratoria", "generar_examen", "generar_rap", "generar_red",
     "corregir_escrito", "corregir_resumen", "explicar_concepto", "evaluar_simulacro",
-    "generar_resumen"
+    "generar_resumen", "math_explain", "math_correct"
 }
 MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 3_000
 CONSULTAS_BASE, CONSULTAS_POR_AD, MAX_BLOQUES_PUBLICIDAD = 5, 5, 2
@@ -199,6 +199,44 @@ REGLAS: Solo un nodo 'core'. Nodos 'main' derivan del core. 'secondary' son deta
         prompt_sistema += '\nResponde en JSON: {"title": "...", "verses": [], "evaluation": {"totalScore": 0-100, "professorFeedback": "..."}}'
         content = f"TEXTO: {material if material else texto}"
         response_format = {"type": "json_object"}
+
+    elif tarea == "math_explain":
+        prompt_sistema = """Eres un profesor de matemáticas experto de la UPE. Tu objetivo es explicar conceptos. 
+REGLA DE ORO: NO resuelvas el ejercicio específico. En su lugar:
+1. Explica el marco teórico brevemente.
+2. Crea un ejercicio "clon" similar pero con diferentes valores.
+3. Resuelve el ejercicio clon paso a paso.
+Responde ESTRICTAMENTE con este JSON:
+{
+  "theoreticalContext": "...",
+  "similarExample": {
+    "problem": "...",
+    "solutionSteps": [],
+    "finalResult": "...",
+    "explanation": "..."
+  },
+  "keyFormulas": [],
+  "tips": []
+}"""
+        content = f"TEMA: {query}\nEJERCICIO ORIGINAL: {texto}"
+        response_format = {"type": "json_object"}
+
+    elif tarea == "math_correct":
+        prompt_sistema = """Eres el Instructor de Matemáticas de la UPE. Corriges con rigor académico. 
+Analiza el procedimiento, no solo el resultado. Responde ESTRICTAMENTE con este JSON:
+{
+  "grade": 0-10,
+  "status": "Aprobado/Aprobado con observaciones/No aprobado",
+  "performanceAnalysis": "...",
+  "stepByStepCorrection": [
+    {"step": "...", "isCorrect": true, "feedback": "...", "correction": "..."}
+  ],
+  "conceptualErrors": [],
+  "finalVerdict": "...",
+  "improvementSuggestions": []
+}"""
+        content = f"CONSIGNA: {consigna}\nRESOLUCIÓN DEL ALUMNO: {texto}\nMATERIAL ADICIONAL: {material}"
+        response_format = {"type": "json_object"}
     
     else:
         content = f"CONTEXTO: {material}\nACCIÓN: {tarea}\nENTRADA: {texto}"
@@ -216,29 +254,45 @@ REGLAS: Solo un nodo 'core'. Nodos 'main' derivan del core. 'secondary' son deta
         return None
 
 # --- RUTAS DE API ---
+@app.route("/api/math/explain", methods=["POST"])
+def api_math_explain():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    data = request.json
+    res = ejecutar_tarea_ia("math_explain", data.get("specificExercise", ""), "", u, query=data.get("topic", ""))
+    if not res: return jsonify({"error": "Error IA"}), 500
+    u.consultas_usadas += 1
+    db.session.commit()
+    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
+
+@app.route("/api/math/correct", methods=["POST"])
+def api_math_correct():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    data = request.json
+    res = ejecutar_tarea_ia("math_correct", data.get("studentAnswer", ""), data.get("referenceMaterial", ""), u, consigna=data.get("exercisePrompt", ""))
+    if not res: return jsonify({"error": "Error IA"}), 500
+    u.consultas_usadas += 1
+    db.session.commit()
+    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
+
 @app.route("/api/corregir_escrito", methods=["POST"])
 def api_corregir_escrito():
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
     data = request.json
-    
-    # Extraemos los 3 campos clave
     escrito = data.get("writing", "")
     consigna = data.get("prompt", "")
     material_consulta = data.get("sourceText", "")
     materia = data.get("materia", "general")
-
     if not escrito or not consigna:
         return jsonify({"error": "Faltan datos obligatorios"}), 400
-
     res = ejecutar_tarea_ia("corregir_escrito", escrito, material_consulta, u, materia=materia, consigna=consigna)
     if not res: return jsonify({"error": "Error IA"}), 500
-    
     u.consultas_usadas += 1
     db.session.commit()
     return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
 
-# (Resto de las rutas permanecen igual según tu archivo original)
 @app.route("/api/usuario")
 def info_usuario():
     u = get_usuario_actual()
@@ -325,4 +379,4 @@ def logout():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-        
+    
