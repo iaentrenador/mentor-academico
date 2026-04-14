@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, WritingCorrectionInput, WritingCorrectionResult, HistoryEntry, CognitiveMapData, SummaryGenerationResult, SummaryCorrectionResult, ConceptualNetworkResult, UniversityText } from './types';
+import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData, ConceptualNetworkResult, UniversityText } from './types';
 import Welcome from './components/Welcome'; 
 import HistoryView from './components/HistoryView';
 import CognitiveMapView from './components/CognitiveMapView';
 import ActivitySelection from './components/ActivitySelection'; 
 import DataEntryView from './components/DataEntryView';
-// IMPORTACIÓN DE NUEVOS COMPONENTES
+// IMPORTACIÓN DE COMPONENTES DE RESÚMENES
 import SummaryToolSelection from './components/SummaryToolSelection';
 import SummaryGenerationInputView from './components/SummaryGenerationInputView';
 import SummaryCorrectionInputView from './components/SummaryCorrectionInputView';
@@ -101,9 +101,8 @@ const App: React.FC = () => {
       SUMMARY: 'Gestión de Resúmenes',
       NETWORK: 'Red Conceptual',
       CORRECTION: 'Corregir Escrito',
-      RAP: 'Rap Técnico Académico',
-      EXAM: 'Examen Parcial',
-      MASTER: 'Sintetizador Maestro'
+      MATH: 'Módulo de Matemáticas',
+      EXAM: 'Examen Parcial'
     };
 
     if (activityId === 'SUMMARY') {
@@ -112,7 +111,7 @@ const App: React.FC = () => {
       setNetworkResult(null);
       setState(AppState.TEXT_DISPLAY);
     } else if (activityId === 'CORRECTION') {
-      setWritingInput(prev => ({ ...prev, activityType: 'CORRECTION' }));
+      setWritingInput(prev => ({ ...prev, activityType: 'CORRECTION', activityTitle: activityTitles[activityId] }));
       setState(AppState.WRITING_CORRECTION_INPUT);
     } else {
       setWritingInput(prev => ({ ...prev, activityType: activityId, activityTitle: activityTitles[activityId] }));
@@ -120,7 +119,6 @@ const App: React.FC = () => {
     }
   };
 
-  // --- LÓGICA CORRECCIÓN DE ESCRITOS (NUEVA) ---
   const handleWritingCorrection = async (input: WritingCorrectionInput) => {
     setLoading(true);
     try {
@@ -140,7 +138,6 @@ const App: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  // --- LÓGICA ESPECÍFICA PARA RESÚMENES ---
   const handleSummaryGeneration = async (title: string, content: string) => {
     setLoading(true);
     try {
@@ -177,7 +174,6 @@ const App: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  // --- LÓGICA RED CONCEPTUAL ---
   const handleGenerateNetwork = async (data: UniversityText) => {
     setLoading(true);
     try {
@@ -200,7 +196,6 @@ const App: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  // --- LÓGICA DATA ENTRY GENERAL (MANTENIDA PARA OTROS MÓDULOS) ---
   const handleDataSubmit = async (data: { text: string; query?: string; profile: string }) => {
     setLoading(true);
     const payload = { ...writingInput, writing: data.text, query: data.query || '', materia: data.profile };
@@ -214,7 +209,7 @@ const App: React.FC = () => {
       if (response.ok) {
         setResultado(resData.resultado);
         setUserStats(prev => ({ ...prev, restantes: resData.restantes }));
-        saveToHistory('ACTIVITY', writingInput.activityTitle, resData.resultado);
+        saveToHistory('ACTIVITY', writingInput.activityTitle || 'Actividad', resData.resultado);
       } else alert(resData.error);
     } catch (error) { alert("Error de conexión"); }
     finally { setLoading(false); }
@@ -255,7 +250,6 @@ const App: React.FC = () => {
           <ActivitySelection onSelect={handleActivitySelect} />
         )}
 
-        {/* --- MÓDULO CORRECCIÓN DE ESCRITOS --- */}
         {state === AppState.WRITING_CORRECTION_INPUT && writingInput.activityType === 'CORRECTION' && (
           <WritingCorrectionForm 
             isLoading={loading}
@@ -270,7 +264,6 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* --- RENDERING MÓDULO RED CONCEPTUAL --- */}
         {state === AppState.TEXT_DISPLAY && !networkResult && (
           <ConceptualNetworkInputView 
             onBack={() => setState(AppState.ACTIVITY_SELECTION)}
@@ -285,7 +278,6 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* --- RENDERING MÓDULO RESÚMENES --- */}
         {state === AppState.SUMMARY_SELECTION && (
           <SummaryToolSelection 
             onBack={() => setState(AppState.ACTIVITY_SELECTION)}
@@ -324,7 +316,6 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* --- OTROS ESTADOS --- */}
         {state === AppState.HISTORY && (
           <HistoryView 
             history={history} 
@@ -359,7 +350,6 @@ const App: React.FC = () => {
 
         {resultado && state === AppState.WRITING_CORRECTION_INPUT && (
           <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            {/* ... visualizador antiguo para otras tareas ... */}
             <div className="bg-indigo-600 p-8 text-white">
               <h3 className="text-3xl font-black italic uppercase">Resultado</h3>
             </div>
@@ -375,4 +365,4 @@ const App: React.FC = () => {
 };
 
 export default App;
-      
+        
