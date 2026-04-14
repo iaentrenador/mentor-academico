@@ -5,9 +5,10 @@ import { HelpCircle, BookOpen, Zap } from 'lucide-react';
 interface MathExplainerFormProps {
   onSubmit: (input: MathExplainerInput) => void;
   onBack: () => void;
+  onGoToCorrection: () => void; // Propiedad agregada
 }
 
-const MathExplainerForm: React.FC<MathExplainerFormProps> = ({ onSubmit, onBack }) => {
+const MathExplainerForm: React.FC<MathExplainerFormProps> = ({ onSubmit, onBack, onGoToCorrection }) => {
   const [topic, setTopic] = useState('');
   const [specificExercise, setSpecificExercise] = useState('');
 
@@ -22,6 +23,14 @@ const MathExplainerForm: React.FC<MathExplainerFormProps> = ({ onSubmit, onBack 
   return (
     <div className="space-y-8 max-w-4xl mx-auto p-4 animate-in slide-in-from-bottom-4">
       <div className="text-center">
+        <div className="flex justify-center mb-2">
+           <button 
+            onClick={onGoToCorrection}
+            className="text-xs font-bold text-indigo-600 hover:underline uppercase tracking-widest"
+          >
+            ¿Preferís corregir un ejercicio ya resuelto?
+          </button>
+        </div>
         <h3 className="text-2xl font-bold text-slate-800">Explicador Matemático</h3>
         <p className="text-slate-500 font-medium">UPE - Ciclo Propedéutico</p>
       </div>
