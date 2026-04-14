@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData, ConceptualNetworkResult, UniversityText, MathExplainerInput, MathCorrectionInput } from './types';
+import { AppState, WritingCorrectionInput, HistoryEntry, CognitiveMapData, ConceptualNetworkResult, UniversityText, MathExplainerInput, MathCorrectionInput, ExamData, ExamEvaluation, ExamQuestionType } from './types';
 import Welcome from './components/Welcome'; 
 import HistoryView from './components/HistoryView';
 import CognitiveMapView from './components/CognitiveMapView';
@@ -24,6 +24,12 @@ import MathExplainerResults from './components/math/MathExplainerResults';
 import MathCorrectionForm from './components/math/MathCorrectionForm';
 import MathCorrectionResults from './components/math/MathCorrectionResults';
 
+// --- IMPORTACIÓN MÓDULO EXAMEN ---
+import ExamInputView from './components/ExamInputView';
+import ExamTakingView from './components/ExamTakingView';
+import ExamResultsView from './components/ExamResultsView';
+import { examService } from './services/examService';
+
 import { BookOpen, ChevronLeft } from 'lucide-react';
 
 // Extendemos el AppState si no está extendido en tus types
@@ -35,7 +41,6 @@ enum MathAppState {
 }
 
 const App: React.FC = () => {
-  // Combinamos los AppState para el manejo interno
   const [state, setState] = useState<AppState | MathAppState | string>(AppState.WELCOME);
   const [loading, setLoading] = useState(false);
   const [userStats, setUserStats] = useState({ logueado: false, restantes: 0 });
@@ -52,6 +57,11 @@ const App: React.FC = () => {
   
   const [resultado, setResultado] = useState<any>(null);
   const [networkResult, setNetworkResult] = useState<ConceptualNetworkResult | null>(null);
+
+  // Estados de Examen
+  const [examData, setExamData] = useState<ExamData | null>(null);
+  const [examEvaluation, setExamEvaluation] = useState<ExamEvaluation | null>(null);
+  const [currentMaterial, setCurrentMaterial] = useState('');
 
   useEffect(() => {
     fetch('/api/usuario')
@@ -105,6 +115,10 @@ const App: React.FC = () => {
     else if (item.type === 'WRITING_CORR') setState(AppState.WRITING_CORRECTION_RESULTS);
     else if (item.type === 'MATH_EXP') setState(MathAppState.MATH_EXPLAINER_RESULTS);
     else if (item.type === 'MATH_CORR') setState(MathAppState.MATH_CORRECTION_RESULTS);
+    else if (item.type === 'EXAM') {
+      setExamEvaluation(item.data);
+      setState(AppState.EXAM_RESULTS);
+    }
     else if (item.type === 'NETWORK') {
       setNetworkResult(item.data);
       setResultado(null);
@@ -131,15 +145,38 @@ const App: React.FC = () => {
       setWritingInput(prev => ({ ...prev, activityType: 'CORRECTION', activityTitle: activityTitles[activityId] }));
       setState(AppState.WRITING_CORRECTION_INPUT);
     } else if (activityId === 'MATH') {
-      // Por defecto al entrar a matemáticas vamos al Explicador
       setState(MathAppState.MATH_EXPLAINER_INPUT);
+    } else if (activityId === 'EXAM') {
+      setState(AppState.EXAM_INPUT);
     } else {
       setWritingInput(prev => ({ ...prev, activityType: activityId, activityTitle: activityTitles[activityId] }));
       setState(AppState.WRITING_CORRECTION_INPUT);
     }
   };
 
-  // --- HANDLERS MATEMÁTICOS ---
+  // HANDLERS EXAMEN
+  const handleStartExam = async (material: string, count: number, types: ExamQuestionType[]) => {
+    setLoading(true);
+    setCurrentMaterial(material);
+    try {
+      const data = await examService.generateExam(material, count, types);
+      setExamData(data);
+      setState(AppState.EXAM_TAKING);
+    } catch (e) { alert("Error al generar examen"); }
+    finally { setLoading(false); }
+  };
+
+  const handleSubmitExam = async (answers: Record<string, string>) => {
+    setLoading(true);
+    try {
+      const evaluation = await examService.evaluateExam(answers, currentMaterial);
+      setExamEvaluation(evaluation);
+      saveToHistory('EXAM', 'Simulacro de Examen', evaluation, evaluation.grade);
+      setState(AppState.EXAM_RESULTS);
+    } catch (e) { alert("Error al corregir examen"); }
+    finally { setLoading(false); }
+  };
+
   const handleMathExplain = async (input: MathExplainerInput) => {
     setLoading(true);
     try {
@@ -309,6 +346,31 @@ const App: React.FC = () => {
           <ActivitySelection onSelect={handleActivitySelect} />
         )}
 
+        {/* --- RENDERIZADO DE EXAMEN --- */}
+        {state === AppState.EXAM_INPUT && (
+          <ExamInputView 
+            onStart={handleStartExam} 
+            onBack={() => setState(AppState.ACTIVITY_SELECTION)} 
+            isLoading={loading} 
+          />
+        )}
+
+        {state === AppState.EXAM_TAKING && examData && (
+          <ExamTakingView 
+            examData={examData} 
+            onSubmit={handleSubmitExam} 
+            isLoading={loading} 
+          />
+        )}
+
+        {state === AppState.EXAM_RESULTS && examEvaluation && (
+          <ExamResultsView 
+            evaluation={examEvaluation} 
+            onRetry={() => setState(AppState.EXAM_INPUT)} 
+            onFinish={() => setState(AppState.WELCOME)} 
+          />
+        )}
+
         {/* --- RENDERIZADO DE MATEMÁTICAS --- */}
         {state === MathAppState.MATH_EXPLAINER_INPUT && (
           <MathExplainerForm 
@@ -341,7 +403,6 @@ const App: React.FC = () => {
             onRetry={() => setState(MathAppState.MATH_CORRECTION_INPUT)}
           />
         )}
-        {/* --- FIN RENDERIZADO DE MATEMÁTICAS --- */}
 
         {state === AppState.WRITING_CORRECTION_INPUT && writingInput.activityType === 'CORRECTION' && (
           <WritingCorrectionForm 
@@ -458,4 +519,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-        
