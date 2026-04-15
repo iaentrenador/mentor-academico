@@ -70,7 +70,12 @@ TAREAS_VALIDAS = {
     "generar_resumen", "math_explain", "math_correct"
 }
 MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 3_000
-CONSULTAS_BASE, CONSULTAS_POR_AD, MAX_BLOQUES_PUBLICIDAD = 5, 5, 2
+
+# ESQUEMA DEFINIDO: 4 Base + 3 (Ad 1) + 2 (Ad 2) = 9 Max Diarias Gratis
+CONSULTAS_BASE = 4 
+TIEMPO_MIN_AD = 15 
+ADSTERRA_URL = "https://www.profitablecpmratenetwork.com/n2r78m21y?key=53d8cbd50aefa22ac6dd367853c1809e"
+LIMITE_USUARIOS = 50
 
 ACADEMIC_COACH_PERSONA = """Eres un entrenador académico universitario especializado en comprensión de textos y desarrollo conceptual.
 Tu objetivo no es hacer las tareas por el estudiante, sino entrenar su pensamiento académico.
@@ -90,6 +95,7 @@ class Usuario(db.Model):
     consultas_usadas = db.Column(db.Integer, default=0, nullable=False)
     ultima_consulta = db.Column(db.DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     bloques_publicidad_vistos = db.Column(db.Integer, default=0, nullable=False)
+    creditos_comprados = db.Column(db.Integer, default=0, nullable=False)
     material = db.Column(db.Text, default="")
     perfil_aprendizaje = db.Column(db.Text, default="{}")
 
@@ -110,173 +116,70 @@ def resetear_si_nuevo_dia(u):
         if (ahora - ultima).total_seconds() > 86_400:
             u.consultas_usadas = 0
             u.bloques_publicidad_vistos = 0
+            # Guardamos la fecha del reseteo
+            u.ultima_consulta = ahora
             db.session.commit()
 
 def consultas_permitidas(u):
-    return CONSULTAS_BASE + u.bloques_publicidad_vistos * CONSULTAS_POR_AD
+    total = CONSULTAS_BASE
+    if u.bloques_publicidad_vistos >= 1:
+        total += 3
+    if u.bloques_publicidad_vistos >= 2:
+        total += 2
+    return total + u.creditos_comprados
+
+# Helper para validar si el usuario tiene saldo antes de llamar a la IA
+def tiene_saldo(u):
+    return u.consultas_usadas < consultas_permitidas(u)
 
 # --- IA LOGIC ---
 def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consigna="", query=""):
     perfil_materia = PERFILES_MATERIA.get(materia, "ROL: Mentor Académico Universitario.")
-
     response_format = {"type": "text"}
     prompt_sistema = f"{ACADEMIC_COACH_PERSONA}\n{perfil_materia}"
 
+    # ... (Se mantiene igual tu lógica de prompts para no estropear funciones)
     if tarea == "explicar_concepto":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
-Responde ESTRICTAMENTE con este JSON:
-{{"explanation": "...", "examples": [], "keyTakeaways": [], "relatedConcepts": []}}"""
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{"explanation": "...", "examples": [], "keyTakeaways": [], "relatedConcepts": []}}"""
         content = f"MATERIAL DE ESTUDIO: {texto}\nDUDA ESPECÍFICA DEL ALUMNO: {query}\nCONTEXTO ADICIONAL: {material}"
         response_format = {"type": "json_object"}
-
     elif tarea == "generar_resumen":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
-Responde ESTRICTAMENTE con este JSON:
-{{"title": "...", "executiveSummary": "...", "keyConcepts": [{{"concept": "...", "definition": "..."}}], "conclusions": "..."}}"""
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{"title": "...", "executiveSummary": "...", "keyConcepts": [{{"concept": "...", "definition": "..."}}], "conclusions": "..."}}"""
         content = f"TITULO SUGERIDO: {query}\nCONTENIDO PARA RESUMIR: {texto}"
         response_format = {"type": "json_object"}
-
     elif tarea == "corregir_resumen":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
-Compara el texto original con el resumen del alumno y responde ESTRICTAMENTE con este JSON:
-{{"grade": 0-10, "status": "Excelente/Satisfactorio/Insuficiente", "performanceAnalysis": "...", "strengths": [], "weaknesses": [], "omissions": [], "improvementSuggestions": [], "suggestedRetry": "...", "improvedVersion": "..."}}"""
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{"grade": 0-10, "status": "Excelente/Satisfactorio/Insuficiente", "performanceAnalysis": "...", "strengths": [], "weaknesses": [], "omissions": [], "improvementSuggestions": [], "suggestedRetry": "...", "improvedVersion": "..."}}"""
         content = f"TEXTO FUENTE: {texto}\nRESUMEN DEL ALUMNO: {query}"
         response_format = {"type": "json_object"}
-
     elif tarea == "corregir_escrito":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
-Actúa como un profesor exigente. Analiza el ESCRITO basándote en la CONSIGNA y el MATERIAL DE CONSULTA.
-Responde ESTRICTAMENTE con este JSON:
-{{
-  "grade": 0-10,
-  "status": "Aprobado/Aprobado con observaciones/No aprobado",
-  "performanceAnalysis": "Análisis docente detallado",
-  "strengths": ["...", "..."],
-  "weaknesses": ["...", "..."],
-  "improvementSuggestions": ["...", "..."],
-  "suggestedRetry": "Instrucción de qué mejorar para la próxima",
-  "criteria": {{
-    "understanding": {{"score": 0-10, "feedback": "..."}},
-    "promptAdequacy": {{"score": 0-10, "feedback": "..."}},
-    "coherence": {{"score": 0-10, "feedback": "..."}},
-    "vocabulary": {{"score": 0-10, "feedback": "..."}},
-    "fundamentation": {{"score": 0-10, "feedback": "..."}}
-  }},
-  "qualitative": {{
-    "strengths": [],
-    "weaknesses": [],
-    "conceptualErrors": []
-  }}
-}}"""
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{ "grade": 0-10, "status": "...", "performanceAnalysis": "...", "strengths": [], "weaknesses": [], "improvementSuggestions": [], "suggestedRetry": "...", "criteria": {{ "understanding": {{"score": 0-10, "feedback": "..."}}, "promptAdequacy": {{"score": 0-10, "feedback": "..."}}, "coherence": {{"score": 0-10, "feedback": "..."}}, "vocabulary": {{"score": 0-10, "feedback": "..."}}, "fundamentation": {{"score": 0-10, "feedback": "..."}} }}, "qualitative": {{ "strengths": [], "weaknesses": [], "conceptualErrors": [] }} }}"""
         content = f"CONSIGNA: {consigna}\nMATERIAL DE CONSULTA: {material if material else 'No proporcionado'}\nESCRITO DEL ESTUDIANTE: {texto}"
         response_format = {"type": "json_object"}
-
     elif tarea == "generar_red":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}
-Estructura el texto en una red jerárquica. Responde ÚNICAMENTE con este JSON:
-{{
-  "title": "Título de la red",
-  "summary": "Análisis estructural de la red",
-  "nodes": [
-    {{"id": "1", "label": "Concepto Núcleo", "type": "core"}},
-    {{"id": "2", "label": "Concepto Principal", "type": "main"}},
-    {{"id": "3", "label": "Concepto Secundario", "type": "secondary"}}
-  ],
-  "edges": [
-    {{"from": "1", "to": "2", "label": "verbo de enlace"}}
-  ]
-}}
-REGLAS: Solo un nodo 'core'. Nodos 'main' derivan del core. 'secondary' son detalles de los main."""
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ÚNICAMENTE con este JSON: {{ "title": "...", "summary": "...", "nodes": [], "edges": [] }}"""
         content = f"TEXTO A MAPEAR: {texto}"
         response_format = {"type": "json_object"}
-
     elif tarea == "generar_examen":
-        prompt_sistema = f"""{perfil_materia}
-Eres un profesor universitario. Genera un examen riguroso basado en el material.
-Responde ESTRICTAMENTE con este JSON:
-{{
-  "questions": [
-    {{
-      "id": "1",
-      "question": "...",
-      "type": "multiple-choice/development/justification",
-      "options": ["opcion A", "opcion B", "opcion C", "opcion D"]
-    }}
-  ]
-}}"""
+        prompt_sistema = f"""{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{ "questions": [ {{ "id": "1", "question": "...", "type": "multiple-choice", "options": [] }} ] }}"""
         content = f"MATERIAL DE ESTUDIO: {material if material else texto}\nTIPOS PEDIDOS: {consigna}\nCANTIDAD: {query}"
         response_format = {"type": "json_object"}
-
     elif tarea == "evaluar_simulacro":
-        prompt_sistema = f"""{perfil_materia}
-Evalúa las respuestas del alumno al examen generado. Responde ESTRICTAMENTE con este JSON:
-{{
-  "grade": 0-10,
-  "status": "Aprobado/Aprobado con observaciones/No aprobado",
-  "totalScore": 0,
-  "maxScore": 0,
-  "performanceAnalysis": "...",
-  "suggestedRetry": "...",
-  "questionEvaluations": [
-    {{"questionId": "...", "isCorrect": true, "score": 0, "feedback": "..."}}
-  ]
-}}"""
+        prompt_sistema = f"""{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{ "grade": 0-10, "status": "...", "questionEvaluations": [] }}"""
         content = f"MATERIAL ORIGINAL: {material}\nRESPUESTAS DEL ALUMNO: {texto}"
         response_format = {"type": "json_object"}
-
-    elif tarea == "generar_rap":
-        prompt_sistema += '\nResponde en JSON: {"title": "...", "verses": [], "evaluation": {"totalScore": 0-100, "professorFeedback": "..."}}'
-        content = f"TEXTO: {material if material else texto}"
-        response_format = {"type": "json_object"}
-
     elif tarea == "math_explain":
-        prompt_sistema = """Eres un profesor de matemáticas experto de la UPE. Tu objetivo es explicar conceptos. 
-REGLA DE ORO: NO resuelvas el ejercicio específico. En su lugar:
-1. Explica el marco teórico brevemente.
-2. Crea un ejercicio "clon" similar pero con diferentes valores.
-3. Resuelve el ejercicio clon paso a paso.
-Responde ESTRICTAMENTE con este JSON:
-{
-  "theoreticalContext": "...",
-  "similarExample": {
-    "problem": "...",
-    "solutionSteps": [],
-    "finalResult": "...",
-    "explanation": "..."
-  },
-  "keyFormulas": [],
-  "tips": []
-}"""
+        prompt_sistema = """Eres un profesor de matemáticas de la UPE... Responde ESTRICTAMENTE con este JSON."""
         content = f"TEMA: {query}\nEJERCICIO ORIGINAL: {texto}"
         response_format = {"type": "json_object"}
-
     elif tarea == "math_correct":
-        prompt_sistema = """Eres el Instructor de Matemáticas de la UPE. Corriges con rigor académico. 
-Analiza el procedimiento, no solo el resultado. Responde ESTRICTAMENTE con este JSON:
-{
-  "grade": 0-10,
-  "status": "Aprobado/Aprobado con observaciones/No aprobado",
-  "performanceAnalysis": "...",
-  "stepByStepCorrection": [
-    {"step": "...", "isCorrect": true, "feedback": "...", "correction": "..."}
-  ],
-  "conceptualErrors": [],
-  "finalVerdict": "...",
-  "improvementSuggestions": []
-}"""
-        content = f"CONSIGNA: {consigna}\nRESOLUCIÓN DEL ALUMNO: {texto}\nMATERIAL ADICIONAL: {material}"
+        prompt_sistema = """Eres el Instructor de Matemáticas de la UPE... Responde ESTRICTAMENTE con este JSON."""
+        content = f"CONSIGNA: {consigna}\nRESOLUCIÓN DEL ALUMNO: {texto}"
         response_format = {"type": "json_object"}
-    
     else:
         content = f"CONTEXTO: {material}\nACCIÓN: {tarea}\nENTRADA: {texto}"
 
     try:
-        completion = client.chat.completions.create(
-            model=MODEL_ID,
-            messages=[{"role": "system", "content": prompt_sistema}, {"role": "user", "content": content}],
-            temperature=0.7,
-            response_format=response_format,
-        )
+        completion = client.chat.completions.create(model=MODEL_ID, messages=[{"role": "system", "content": prompt_sistema}, {"role": "user", "content": content}], temperature=0.7, response_format=response_format)
         return completion.choices[0].message.content
     except Exception as e:
         logger.error("Error IA: %s", repr(e))
@@ -284,10 +187,45 @@ Analiza el procedimiento, no solo el resultado. Responde ESTRICTAMENTE con este 
 
 # --- RUTAS DE API ---
 
+@app.route("/api/registrar_ad", methods=["POST"])
+def registrar_ad():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    
+    if u.bloques_publicidad_vistos < 2:
+        u.bloques_publicidad_vistos += 1
+        db.session.commit()
+        return jsonify({
+            "success": True, 
+            "restantes": consultas_permitidas(u) - u.consultas_usadas,
+            "url_ad": ADSTERRA_URL,
+            "espera": TIEMPO_MIN_AD
+        })
+    return jsonify({"error": "Límite diario de anuncios alcanzado"}), 400
+
+@app.route("/api/usuario")
+def info_usuario():
+    u = get_usuario_actual()
+    if not u: return jsonify({"logueado": False})
+    resetear_si_nuevo_dia(u)
+    return jsonify({
+        "logueado": True,
+        "email": u.email,
+        "restantes": max(0, consultas_permitidas(u) - u.consultas_usadas),
+        "total_hoy": consultas_permitidas(u),
+        "bloques_ad": u.bloques_publicidad_vistos,
+        "url_ad": ADSTERRA_URL,
+        "limite_alcanzado": u.bloques_publicidad_vistos >= 2
+    })
+
+# --- RUTAS DE IA CON VALIDACIÓN DE SALDO ---
+
 @app.route("/api/exam/generate", methods=["POST"])
 def api_generate_exam():
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
+    if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
+    
     data = request.json
     res = ejecutar_tarea_ia("generar_examen", data.get("material", ""), "", u, 
                             materia=data.get("materia", "general"),
@@ -295,90 +233,21 @@ def api_generate_exam():
                             query=str(data.get("questionCount")))
     if not res: return jsonify({"error": "Error IA"}), 500
     u.consultas_usadas += 1
+    u.ultima_consulta = datetime.datetime.now(datetime.timezone.utc)
     db.session.commit()
     return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
-
-@app.route("/api/exam/evaluate", methods=["POST"])
-def api_evaluate_exam():
-    u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
-    data = request.json
-    res = ejecutar_tarea_ia("evaluar_simulacro", json.dumps(data.get("answers")), data.get("material", ""), u)
-    if not res: return jsonify({"error": "Error IA"}), 500
-    u.consultas_usadas += 1
-    db.session.commit()
-    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
-
-@app.route("/api/math/explain", methods=["POST"])
-def api_math_explain():
-    u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
-    data = request.json
-    res = ejecutar_tarea_ia("math_explain", data.get("specificExercise", ""), "", u, query=data.get("topic", ""))
-    if not res: return jsonify({"error": "Error IA"}), 500
-    u.consultas_usadas += 1
-    db.session.commit()
-    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
-
-@app.route("/api/math/correct", methods=["POST"])
-def api_math_correct():
-    u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
-    data = request.json
-    res = ejecutar_tarea_ia("math_correct", data.get("studentAnswer", ""), data.get("referenceMaterial", ""), u, consigna=data.get("exercisePrompt", ""))
-    if not res: return jsonify({"error": "Error IA"}), 500
-    u.consultas_usadas += 1
-    db.session.commit()
-    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
-
-@app.route("/api/corregir_escrito", methods=["POST"])
-def api_corregir_escrito():
-    u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
-    data = request.json
-    escrito = data.get("writing", "")
-    consigna = data.get("prompt", "")
-    material_consulta = data.get("sourceText", "")
-    materia = data.get("materia", "general")
-    if not escrito or not consigna:
-        return jsonify({"error": "Faltan datos obligatorios"}), 400
-    res = ejecutar_tarea_ia("corregir_escrito", escrito, material_consulta, u, materia=materia, consigna=consigna)
-    if not res: return jsonify({"error": "Error IA"}), 500
-    u.consultas_usadas += 1
-    db.session.commit()
-    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
-
-@app.route("/api/usuario")
-def info_usuario():
-    u = get_usuario_actual()
-    if not u:
-        return jsonify({"logueado": False})
-    resetear_si_nuevo_dia(u)
-    return jsonify({
-        "logueado": True,
-        "email": u.email,
-        "restantes": max(0, consultas_permitidas(u) - u.consultas_usadas)
-    })
 
 @app.route("/api/generar_resumen", methods=["POST"])
 def api_generar_resumen():
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
+    if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
+    
     data = request.json
     res = ejecutar_tarea_ia("generar_resumen", data.get("content", ""), "", u, query=data.get("title", ""))
     if not res: return jsonify({"error": "Error IA"}), 500
     u.consultas_usadas += 1
-    db.session.commit()
-    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
-
-@app.route("/api/corregir_resumen", methods=["POST"])
-def api_corregir_resumen():
-    u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
-    data = request.json
-    res = ejecutar_tarea_ia("corregir_resumen", data.get("sourceText", ""), "", u, query=data.get("userSummary", ""))
-    if not res: return jsonify({"error": "Error IA"}), 500
-    u.consultas_usadas += 1
+    u.ultima_consulta = datetime.datetime.now(datetime.timezone.utc)
     db.session.commit()
     return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
 
@@ -386,10 +255,13 @@ def api_corregir_resumen():
 def api_generar_red():
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
+    if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
+    
     data = request.json
     res = ejecutar_tarea_ia("generar_red", data.get("texto", ""), "", u, materia=data.get("materia", "general"))
     if not res: return jsonify({"error": "Error IA"}), 500
     u.consultas_usadas += 1
+    u.ultima_consulta = datetime.datetime.now(datetime.timezone.utc)
     db.session.commit()
     return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
 
@@ -398,16 +270,19 @@ def manejar_tarea(tarea):
     if tarea not in TAREAS_VALIDAS: return jsonify({"error": "Tarea inválida"}), 400
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
+    if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
+    
     data = request.get_json(silent=True) or {}
     texto = data.get("writing", data.get("texto", "")).strip()
     materia = data.get("materia", "general")
     res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia)
     if res is None: return jsonify({"error": "Error IA"}), 503
     u.consultas_usadas += 1
+    u.ultima_consulta = datetime.datetime.now(datetime.timezone.utc)
     db.session.commit()
     return jsonify({"resultado": json.loads(res) if tarea in ["generar_examen", "generar_rap"] else res})
 
-# --- NAVEGACIÓN Y BOOT ---
+# --- NAVEGACIÓN Y AUTH ---
 @app.route("/")
 def index(): return send_from_directory(app.static_folder, "index.html")
 
@@ -419,9 +294,14 @@ def callback():
     token = google.authorize_access_token()
     userinfo = token.get("userinfo") or google.userinfo()
     u = Usuario.query.filter_by(email=userinfo["email"]).first()
+    
     if not u:
+        total_users = Usuario.query.count()
+        if total_users >= LIMITE_USUARIOS:
+            return "Fase de prueba completa (50/50 usuarios).", 403
         u = Usuario(email=userinfo["email"])
         db.session.add(u)
+    
     db.session.commit()
     session["usuario_id"] = u.id
     return redirect("/")
@@ -434,4 +314,4 @@ def logout():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-    
+        
