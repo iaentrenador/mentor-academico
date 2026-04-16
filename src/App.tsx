@@ -37,7 +37,6 @@ const App: React.FC = () => {
   const [userStats, setUserStats] = useState({ logueado: false, restantes: 0, url_ad: '', bloques_ad: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
-  // --- ESTADOS PARA PUBLICIDAD ---
   const [showAdModal, setShowAdModal] = useState(false);
   const [adCounter, setAdCounter] = useState(0);
   const [canConfirmAd, setCanConfirmAd] = useState(false);
@@ -68,7 +67,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Lógica del contador de publicidad
   useEffect(() => {
     let timer: number;
     if (showAdModal && adCounter > 0) {
@@ -322,27 +320,6 @@ const App: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  const handleDataSubmit = async (data: { text: string; query?: string; profile: string }) => {
-    if (!checkCredits()) return;
-    setLoading(true);
-    const payload = { ...writingInput, writing: data.text, query: data.query || '', materia: data.profile };
-    try {
-      const response = await fetch(`/api/${writingInput.activityType?.toLowerCase()}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const resData = await response.json();
-      if (response.ok) {
-        setResultado(resData.resultado);
-        setUserStats(prev => ({ ...prev, restantes: resData.restantes }));
-        saveToHistory('ACTIVITY', writingInput.activityTitle || 'Actividad', resData.resultado);
-        setState(AppState.WRITING_CORRECTION_RESULTS);
-      } else alert(resData.error);
-    } catch (error) { alert("Error de conexión"); }
-    finally { setLoading(false); }
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
       {/* MODAL DE PUBLICIDAD */}
@@ -431,7 +408,11 @@ const App: React.FC = () => {
         )}
 
         {state === AppState.HISTORY && (
-          <HistoryView history={history} onItemSelect={handleViewHistoryItem} onBack={() => setState(AppState.WELCOME)} />
+          <HistoryView 
+            history={history} 
+            onSelect={handleViewHistoryItem} 
+            onBack={() => setState(AppState.WELCOME)} 
+          />
         )}
 
         {state === AppState.COGNITIVE_MAP && (
@@ -475,31 +456,51 @@ const App: React.FC = () => {
         )}
 
         {state === AppState.TEXT_DISPLAY && (
-          <ConceptualNetworkInputView onBack={() => setState(AppState.ACTIVITY_SELECTION)} onSubmit={handleGenerateNetwork} isLoading={loading} />
+          <ConceptualNetworkInputView 
+            onBack={() => setState(AppState.ACTIVITY_SELECTION)} 
+            onSubmit={handleGenerateNetwork} 
+          />
         )}
 
         {state === AppState.CONCEPTUAL_NETWORK_RESULTS && networkResult && (
-          <ConceptualNetworkView data={networkResult} onBack={() => setState(AppState.TEXT_DISPLAY)} />
+          <ConceptualNetworkView result={networkResult} onBack={() => setState(AppState.TEXT_DISPLAY)} />
         )}
 
         {state === AppState.SUMMARY_SELECTION && (
-          <SummaryToolSelection onBack={() => setState(AppState.ACTIVITY_SELECTION)} onSelect={(tool) => setState(tool === 'GENERATE' ? AppState.SUMMARY_GENERATION_INPUT : AppState.SUMMARY_CORRECTION_INPUT)} />
+          <SummaryToolSelection 
+            onBack={() => setState(AppState.ACTIVITY_SELECTION)} 
+            onSelectTool={(tool) => setState(tool === 'GENERATE' ? AppState.SUMMARY_GENERATION_INPUT : AppState.SUMMARY_CORRECTION_INPUT)} 
+          />
         )}
 
         {state === AppState.SUMMARY_GENERATION_INPUT && (
-          <SummaryGenerationInputView onBack={() => setState(AppState.SUMMARY_SELECTION)} onSubmit={handleSummaryGeneration} isLoading={loading} />
+          <SummaryGenerationInputView 
+            onBack={() => setState(AppState.SUMMARY_SELECTION)} 
+            onSubmit={handleSummaryGeneration} 
+            loading={loading} 
+          />
         )}
 
         {state === AppState.SUMMARY_GENERATION_RESULTS && resultado && (
-          <SummaryGenerationResultsView result={resultado} onBack={() => setState(AppState.SUMMARY_GENERATION_INPUT)} onFinish={() => setState(AppState.WELCOME)} />
+          <SummaryGenerationResultsView 
+            result={resultado} 
+            onFinish={() => setState(AppState.WELCOME)} 
+          />
         )}
 
         {state === AppState.SUMMARY_CORRECTION_INPUT && (
-          <SummaryCorrectionInputView onBack={() => setState(AppState.SUMMARY_SELECTION)} onSubmit={handleSummaryCorrection} isLoading={loading} />
+          <SummaryCorrectionInputView 
+            onBack={() => setState(AppState.SUMMARY_SELECTION)} 
+            onSubmit={handleSummaryCorrection} 
+            loading={loading} 
+          />
         )}
 
         {state === AppState.SUMMARY_CORRECTION_RESULTS && resultado && (
-          <SummaryCorrectionResultsView result={resultado} onBack={() => setState(AppState.SUMMARY_CORRECTION_INPUT)} onFinish={() => setState(AppState.WELCOME)} />
+          <SummaryCorrectionResultsView 
+            result={resultado} 
+            onFinish={() => setState(AppState.WELCOME)} 
+          />
         )}
       </main>
     </div>
@@ -507,3 +508,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
