@@ -5,10 +5,10 @@ import { CheckCircle2, AlertTriangle, XCircle, Star, RefreshCcw, ArrowRight, Lig
 
 interface SummaryCorrectionResultsViewProps {
   result: SummaryCorrectionResult;
-  onRestart: () => void;
+  onFinish: () => void; // Cambiado de onRestart a onFinish
 }
 
-const SummaryCorrectionResultsView: React.FC<SummaryCorrectionResultsViewProps> = ({ result, onRestart }) => {
+const SummaryCorrectionResultsView: React.FC<SummaryCorrectionResultsViewProps> = ({ result, onFinish }) => {
   // Lógica de colores según la nota
   const getGradeStyles = (grade: number) => {
     if (grade >= 9) return { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' };
@@ -117,7 +117,7 @@ const SummaryCorrectionResultsView: React.FC<SummaryCorrectionResultsViewProps> 
       {/* Acción Final */}
       <div className="flex justify-center pb-10">
         <button 
-          onClick={onRestart}
+          onClick={onFinish}
           className="group px-12 py-5 bg-indigo-600 text-white font-black rounded-[2rem] hover:bg-slate-900 transition-all shadow-xl shadow-indigo-200 active:scale-95 flex items-center gap-3 uppercase tracking-[0.2em] text-xs"
         >
           <RefreshCcw size={18} className="group-hover:rotate-180 transition-transform duration-700" />
