@@ -27,3 +27,45 @@ body {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* --- NUEVAS ANIMACIONES PARA EL SISTEMA DE PUBLICIDAD --- */
+
+/* Animación de entrada suave para el fondo oscuro */
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Animación de escala para el cartel del anuncio */
+@keyframes zoomIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Clases que usa el nuevo App.tsx */
+.animate-in {
+  animation-duration: 300ms;
+  animation-fill-mode: forwards;
+  animation-timing-function: ease-out;
+}
+
+.fade-in {
+  animation-name: modalFadeIn;
+}
+
+.zoom-in-95 {
+  animation-name: zoomIn;
+}
+
+/* Efecto de desenfoque del fondo (Backdrop Blur) */
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Transiciones suaves para barras de progreso y botones */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
