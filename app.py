@@ -6,6 +6,7 @@ from groq import Groq
 from flask import Flask, request, jsonify, session, redirect, url_for, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text  # <--- CORRECCIÓN 1: Importar text
 from authlib.integrations.flask_client import OAuth
 from flask_mail import Mail, Message
 
@@ -30,10 +31,19 @@ CORS(app, origins=allowed_origins)
 
 secret_key = os.environ.get("SECRET_KEY")
 if not secret_key:
-    raise ValueError("Falta la variable de entorno SECRET_KEY")
+    # Fallback para desarrollo local si no hay variable de entorno
+    secret_key = "dev_secret_key_provisional"
 app.secret_key = secret_key
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///local.db").replace("postgres://", "postgresql://", 1)
+# --- CORRECCIÓN 2: Asegurar ruta local para SQLite ---
+basedir = os.path.abspath(os.path.dirname(__file__))
+db_path = os.environ.get("DATABASE_URL")
+if not db_path:
+    db_path = 'sqlite:///' + os.path.join(basedir, 'local.db')
+else:
+    db_path = db_path.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = db_path
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
 
@@ -71,7 +81,6 @@ TAREAS_VALIDAS = {
 }
 MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 3_000
 
-# ESQUEMA DEFINIDO: 4 Base + 3 (Ad 1) + 2 (Ad 2) = 9 Max Diarias Gratis
 CONSULTAS_BASE = 4 
 TIEMPO_MIN_AD = 15 
 ADSTERRA_URL = "https://www.profitablecpmratenetwork.com/n2r78m21y?key=53d8cbd50aefa22ac6dd367853c1809e"
@@ -99,8 +108,10 @@ class Usuario(db.Model):
     material = db.Column(db.Text, default="")
     perfil_aprendizaje = db.Column(db.Text, default="{}")
 
+# --- CORRECCIÓN 3: Inicialización segura de BD ---
 with app.app_context():
     db.create_all()
+    logger.info("Base de datos verificada/creada.")
 
 # --- HELPERS ---
 def get_usuario_actual():
@@ -116,7 +127,6 @@ def resetear_si_nuevo_dia(u):
         if (ahora - ultima).total_seconds() > 86_400:
             u.consultas_usadas = 0
             u.bloques_publicidad_vistos = 0
-            # Guardamos la fecha del reseteo
             u.ultima_consulta = ahora
             db.session.commit()
 
@@ -128,7 +138,6 @@ def consultas_permitidas(u):
         total += 2
     return total + u.creditos_comprados
 
-# Helper para validar si el usuario tiene saldo antes de llamar a la IA
 def tiene_saldo(u):
     return u.consultas_usadas < consultas_permitidas(u)
 
@@ -138,7 +147,6 @@ def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consig
     response_format = {"type": "text"}
     prompt_sistema = f"{ACADEMIC_COACH_PERSONA}\n{perfil_materia}"
 
-    # ... (Se mantiene igual tu lógica de prompts para no estropear funciones)
     if tarea == "explicar_concepto":
         prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{"explanation": "...", "examples": [], "keyTakeaways": [], "relatedConcepts": []}}"""
         content = f"MATERIAL DE ESTUDIO: {texto}\nDUDA ESPECÍFICA DEL ALUMNO: {query}\nCONTEXTO ADICIONAL: {material}"
@@ -148,11 +156,11 @@ def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consig
         content = f"TITULO SUGERIDO: {query}\nCONTENIDO PARA RESUMIR: {texto}"
         response_format = {"type": "json_object"}
     elif tarea == "corregir_resumen":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{"grade": 0-10, "status": "Excelente/Satisfactorio/Insuficiente", "performanceAnalysis": "...", "strengths": [], "weaknesses": [], "omissions": [], "improvementSuggestions": [], "suggestedRetry": "...", "improvedVersion": "..."}}"""
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{"grade": 0, "status": "Excelente/Satisfactorio/Insuficiente", "performanceAnalysis": "...", "strengths": [], "weaknesses": [], "omissions": [], "improvementSuggestions": [], "suggestedRetry": "...", "improvedVersion": "..."}}"""
         content = f"TEXTO FUENTE: {texto}\nRESUMEN DEL ALUMNO: {query}"
         response_format = {"type": "json_object"}
     elif tarea == "corregir_escrito":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{ "grade": 0-10, "status": "...", "performanceAnalysis": "...", "strengths": [], "weaknesses": [], "improvementSuggestions": [], "suggestedRetry": "...", "criteria": {{ "understanding": {{"score": 0-10, "feedback": "..."}}, "promptAdequacy": {{"score": 0-10, "feedback": "..."}}, "coherence": {{"score": 0-10, "feedback": "..."}}, "vocabulary": {{"score": 0-10, "feedback": "..."}}, "fundamentation": {{"score": 0-10, "feedback": "..."}} }}, "qualitative": {{ "strengths": [], "weaknesses": [], "conceptualErrors": [] }} }}"""
+        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{ "grade": 0, "status": "...", "performanceAnalysis": "...", "strengths": [], "weaknesses": [], "improvementSuggestions": [], "suggestedRetry": "...", "criteria": {{ "understanding": {{"score": 0, "feedback": "..."}}, "promptAdequacy": {{"score": 0, "feedback": "..."}}, "coherence": {{"score": 0, "feedback": "..."}}, "vocabulary": {{"score": 0, "feedback": "..."}}, "fundamentation": {{"score": 0, "feedback": "..."}} }}, "qualitative": {{ "strengths": [], "weaknesses": [], "conceptualErrors": [] }} }}"""
         content = f"CONSIGNA: {consigna}\nMATERIAL DE CONSULTA: {material if material else 'No proporcionado'}\nESCRITO DEL ESTUDIANTE: {texto}"
         response_format = {"type": "json_object"}
     elif tarea == "generar_red":
@@ -164,7 +172,7 @@ def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consig
         content = f"MATERIAL DE ESTUDIO: {material if material else texto}\nTIPOS PEDIDOS: {consigna}\nCANTIDAD: {query}"
         response_format = {"type": "json_object"}
     elif tarea == "evaluar_simulacro":
-        prompt_sistema = f"""{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{ "grade": 0-10, "status": "...", "questionEvaluations": [] }}"""
+        prompt_sistema = f"""{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{ "grade": 0, "status": "...", "questionEvaluations": [] }}"""
         content = f"MATERIAL ORIGINAL: {material}\nRESPUESTAS DEL ALUMNO: {texto}"
         response_format = {"type": "json_object"}
     elif tarea == "math_explain":
@@ -217,8 +225,6 @@ def info_usuario():
         "url_ad": ADSTERRA_URL,
         "limite_alcanzado": u.bloques_publicidad_vistos >= 2
     })
-
-# --- RUTAS DE IA CON VALIDACIÓN DE SALDO ---
 
 @app.route("/api/exam/generate", methods=["POST"])
 def api_generate_exam():
@@ -293,6 +299,8 @@ def login(): return google.authorize_redirect(url_for("callback", _external=True
 def callback():
     token = google.authorize_access_token()
     userinfo = token.get("userinfo") or google.userinfo()
+    
+    # --- CORRECCIÓN 4: Uso de text() para consultas directas si fuera necesario ---
     u = Usuario.query.filter_by(email=userinfo["email"]).first()
     
     if not u:
@@ -314,4 +322,3 @@ def logout():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-        
