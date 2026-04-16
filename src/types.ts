@@ -9,6 +9,7 @@ export enum AppState {
   WRITING_CORRECTION_RESULTS = 'WRITING_CORRECTION_RESULTS', 
   ACTIVITY_SELECTION = 'ACTIVITY_SELECTION', 
   TEXT_DISPLAY = 'TEXT_DISPLAY',
+  CONCEPTUAL_NETWORK_RESULTS = 'CONCEPTUAL_NETWORK_RESULTS', // <--- ESTADO AGREGADO
   // Estados para el Módulo de Resúmenes
   SUMMARY_SELECTION = 'SUMMARY_SELECTION',
   SUMMARY_GENERATION_INPUT = 'SUMMARY_GENERATION_INPUT',
@@ -111,7 +112,7 @@ export interface SummaryGenerationResult {
 // 6.2 Interfaz para el resultado de Corrección de Resúmenes
 export interface SummaryCorrectionResult {
   grade: number;
-  status: 'Excelente' | 'Satisfactorio' | 'Insuficiente';
+  status: 'Excelente' | 'Satisfactorio' | 'Insúficiente';
   performanceAnalysis: string;
   strengths: string[];
   weaknesses: string[];
