@@ -3,10 +3,10 @@ import { ConceptualNetworkResult } from '../types';
 
 interface Props {
   result: ConceptualNetworkResult;
-  onRestart: () => void;
+  onBack: () => void; // Cambiado de onRestart a onBack
 }
 
-const ConceptualNetworkView: React.FC<Props> = ({ result, onRestart }) => {
+const ConceptualNetworkView: React.FC<Props> = ({ result, onBack }) => {
   const coreNodes = result.nodes.filter(n => n.type === 'core');
   const mainNodes = result.nodes.filter(n => n.type === 'main');
 
@@ -96,7 +96,7 @@ const ConceptualNetworkView: React.FC<Props> = ({ result, onRestart }) => {
       {/* Botón Reiniciar */}
       <div className="flex justify-center pt-8">
         <button 
-          onClick={onRestart}
+          onClick={onBack}
           className="px-12 py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-xl active:scale-95 flex items-center gap-3"
         >
           <span>Analizar otro Material</span>
