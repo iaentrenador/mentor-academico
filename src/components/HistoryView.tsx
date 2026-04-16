@@ -15,10 +15,10 @@ import {
 interface HistoryViewProps {
   history: HistoryEntry[];
   onBack: () => void;
-  onViewItem: (item: HistoryEntry) => void;
+  onSelect: (item: HistoryEntry) => void; // Cambiado de onViewItem a onSelect
 }
 
-const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onViewItem }) => {
+const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onSelect }) => {
   
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -82,7 +82,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onBack, onViewItem }
             <div 
               key={item.id} 
               className="group bg-white border-2 border-slate-100 rounded-3xl p-6 hover:border-indigo-600 hover:shadow-2xl hover:shadow-indigo-100 transition-all cursor-pointer flex items-center gap-6"
-              onClick={() => onViewItem(item)}
+              onClick={() => onSelect(item)} // Cambiado de onViewItem a onSelect
             >
               {/* Icono de Tipo con fondo dinámico */}
               <div className="hidden sm:flex w-14 h-14 bg-slate-50 rounded-2xl items-center justify-center group-hover:bg-indigo-50 transition-colors shadow-inner">
