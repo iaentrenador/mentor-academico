@@ -145,6 +145,7 @@ const App: React.FC = () => {
     else if (item.type === 'NETWORK') {
       setNetworkResult(item.data);
       setResultado(null);
+      setState(AppState.CONCEPTUAL_NETWORK_RESULTS);
     }
     else setState(AppState.WRITING_CORRECTION_INPUT);
   };
@@ -315,6 +316,7 @@ const App: React.FC = () => {
         setNetworkResult(resData.resultado);
         saveToHistory('NETWORK', data.title, resData.resultado);
         setUserStats(prev => ({ ...prev, restantes: resData.restantes }));
+        setState(AppState.CONCEPTUAL_NETWORK_RESULTS);
       } else alert(resData.error);
     } catch (e) { alert("Error de conexión"); }
     finally { setLoading(false); }
@@ -335,6 +337,7 @@ const App: React.FC = () => {
         setResultado(resData.resultado);
         setUserStats(prev => ({ ...prev, restantes: resData.restantes }));
         saveToHistory('ACTIVITY', writingInput.activityTitle || 'Actividad', resData.resultado);
+        setState(AppState.WRITING_CORRECTION_RESULTS);
       } else alert(resData.error);
     } catch (error) { alert("Error de conexión"); }
     finally { setLoading(false); }
@@ -427,6 +430,14 @@ const App: React.FC = () => {
           />
         )}
 
+        {state === AppState.HISTORY && (
+          <HistoryView history={history} onItemSelect={handleViewHistoryItem} onBack={() => setState(AppState.WELCOME)} />
+        )}
+
+        {state === AppState.COGNITIVE_MAP && (
+          <CognitiveMapView data={getCognitiveMapData()} onBack={() => setState(AppState.WELCOME)} />
+        )}
+
         {state === AppState.EXAM_INPUT && (
           <ExamInputView onStart={handleStartExam} onBack={() => setState(AppState.ACTIVITY_SELECTION)} isLoading={loading} />
         )}
@@ -464,9 +475,31 @@ const App: React.FC = () => {
         )}
 
         {state === AppState.TEXT_DISPLAY && (
-           <div className="flex-1 flex flex-col">
-              {/* Aquí iría la lógica de renderizado para TEXT_DISPLAY si el archivo estuviera completo */}
-           </div>
+          <ConceptualNetworkInputView onBack={() => setState(AppState.ACTIVITY_SELECTION)} onSubmit={handleGenerateNetwork} isLoading={loading} />
+        )}
+
+        {state === AppState.CONCEPTUAL_NETWORK_RESULTS && networkResult && (
+          <ConceptualNetworkView data={networkResult} onBack={() => setState(AppState.TEXT_DISPLAY)} />
+        )}
+
+        {state === AppState.SUMMARY_SELECTION && (
+          <SummaryToolSelection onBack={() => setState(AppState.ACTIVITY_SELECTION)} onSelect={(tool) => setState(tool === 'GENERATE' ? AppState.SUMMARY_GENERATION_INPUT : AppState.SUMMARY_CORRECTION_INPUT)} />
+        )}
+
+        {state === AppState.SUMMARY_GENERATION_INPUT && (
+          <SummaryGenerationInputView onBack={() => setState(AppState.SUMMARY_SELECTION)} onSubmit={handleSummaryGeneration} isLoading={loading} />
+        )}
+
+        {state === AppState.SUMMARY_GENERATION_RESULTS && resultado && (
+          <SummaryGenerationResultsView result={resultado} onBack={() => setState(AppState.SUMMARY_GENERATION_INPUT)} onFinish={() => setState(AppState.WELCOME)} />
+        )}
+
+        {state === AppState.SUMMARY_CORRECTION_INPUT && (
+          <SummaryCorrectionInputView onBack={() => setState(AppState.SUMMARY_SELECTION)} onSubmit={handleSummaryCorrection} isLoading={loading} />
+        )}
+
+        {state === AppState.SUMMARY_CORRECTION_RESULTS && resultado && (
+          <SummaryCorrectionResultsView result={resultado} onBack={() => setState(AppState.SUMMARY_CORRECTION_INPUT)} onFinish={() => setState(AppState.WELCOME)} />
         )}
       </main>
     </div>
@@ -474,4 +507,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
