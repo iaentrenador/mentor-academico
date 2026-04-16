@@ -179,7 +179,13 @@ const App: React.FC = () => {
       setExamData(data);
       setState(AppState.EXAM_TAKING);
       fetchUserStats();
-    } catch (e) { alert("Error al generar examen"); }
+    } catch (e) { 
+      if (e instanceof Error && e.message === 'CREDITS_EXHAUSTED') {
+        setShowAdModal(true);
+      } else {
+        alert("Error al generar examen");
+      }
+    }
     finally { setLoading(false); }
   };
 
@@ -415,7 +421,10 @@ const App: React.FC = () => {
         )}
 
         {state === AppState.ACTIVITY_SELECTION && (
-          <ActivitySelection onSelect={handleActivitySelect} />
+          <ActivitySelection 
+            onSelect={handleActivitySelect} 
+            restantes={userStats.restantes} 
+          />
         )}
 
         {state === AppState.EXAM_INPUT && (
@@ -451,64 +460,4 @@ const App: React.FC = () => {
         )}
 
         {state === AppState.WRITING_CORRECTION_RESULTS && resultado && (
-          <CorrectionResultsView result={resultado} onRetry={() => { setResultado(null); setState(AppState.WRITING_CORRECTION_INPUT); }} />
-        )}
-
-        {state === AppState.TEXT_DISPLAY && !networkResult && (
-          <ConceptualNetworkInputView onBack={() => setState(AppState.ACTIVITY_SELECTION)} onSubmit={handleGenerateNetwork} />
-        )}
-
-        {networkResult && (
-          <ConceptualNetworkView result={networkResult} onRestart={() => { setNetworkResult(null); setState(AppState.ACTIVITY_SELECTION); }} />
-        )}
-
-        {state === AppState.SUMMARY_SELECTION && (
-          <SummaryToolSelection onBack={() => setState(AppState.ACTIVITY_SELECTION)} onStartAutomatic={() => setState(AppState.SUMMARY_GENERATION_INPUT)} onStartCorrection={() => setState(AppState.SUMMARY_CORRECTION_INPUT)} />
-        )}
-
-        {state === AppState.SUMMARY_GENERATION_INPUT && (
-          <SummaryGenerationInputView onBack={() => setState(AppState.SUMMARY_SELECTION)} onSubmit={handleSummaryGeneration} loading={loading} />
-        )}
-
-        {state === AppState.SUMMARY_CORRECTION_INPUT && (
-          <SummaryCorrectionInputView onBack={() => setState(AppState.SUMMARY_SELECTION)} onSubmit={handleSummaryCorrection} loading={loading} />
-        )}
-
-        {state === AppState.SUMMARY_GENERATION_RESULTS && resultado && (
-          <SummaryGenerationResultsView result={resultado} onRestart={() => { setResultado(null); setState(AppState.SUMMARY_SELECTION); }} />
-        )}
-
-        {state === AppState.SUMMARY_CORRECTION_RESULTS && resultado && (
-          <SummaryCorrectionResultsView result={resultado} onRestart={() => { setResultado(null); setState(AppState.SUMMARY_SELECTION); }} />
-        )}
-
-        {state === AppState.HISTORY && (
-          <HistoryView history={history} onBack={() => setState(AppState.WELCOME)} onViewItem={handleViewHistoryItem} />
-        )}
-
-        {state === AppState.COGNITIVE_MAP && (
-          <CognitiveMapView data={getCognitiveMapData()} onBack={() => setState(AppState.WELCOME)} />
-        )}
-
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            <p className="mt-4 text-slate-600 font-medium">Procesando material académico...</p>
-          </div>
-        )}
-
-        {state === AppState.WRITING_CORRECTION_INPUT && writingInput.activityType !== 'CORRECTION' && !resultado && !loading && (
-          <DataEntryView activityId={writingInput.activityType || ''} activityTitle={writingInput.activityTitle || ''} onBack={() => setState(AppState.ACTIVITY_SELECTION)} onSubmit={handleDataSubmit} loading={loading} />
-        )}
-
-        {resultado && state === AppState.WRITING_CORRECTION_INPUT && (
-          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-             {/* Contenido del resultado aquí */}
-          </div>
-        )}
-      </main>
-    </div>
-  );
-};
-
-export default App;
+        
