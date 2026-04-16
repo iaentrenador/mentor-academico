@@ -460,4 +460,18 @@ const App: React.FC = () => {
         )}
 
         {state === AppState.WRITING_CORRECTION_RESULTS && resultado && (
-        
+          <CorrectionResultsView result={resultado} onRetry={() => { setResultado(null); setState(AppState.WRITING_CORRECTION_INPUT); }} />
+        )}
+
+        {state === AppState.TEXT_DISPLAY && (
+           <div className="flex-1 flex flex-col">
+              {/* Aquí iría la lógica de renderizado para TEXT_DISPLAY si el archivo estuviera completo */}
+           </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default App;
+
