@@ -17,6 +17,10 @@ export const examService = {
     });
 
     if (!response.ok) {
+      // Si el servidor responde 403, lanzamos un error específico que App.tsx sepa leer
+      if (response.status === 403) {
+        throw new Error('CREDITS_EXHAUSTED');
+      }
       const errorData = await response.json();
       throw new Error(errorData.error || 'Error al generar el examen');
     }
@@ -39,6 +43,10 @@ export const examService = {
     });
 
     if (!response.ok) {
+      // También validamos créditos aquí por seguridad
+      if (response.status === 403) {
+        throw new Error('CREDITS_EXHAUSTED');
+      }
       const errorData = await response.json();
       throw new Error(errorData.error || 'Error al evaluar el examen');
     }
