@@ -3,11 +3,10 @@ import React from 'react';
 
 interface SummaryToolSelectionProps {
   onBack: () => void;
-  onStartCorrection: () => void;
-  onStartAutomatic: () => void;
+  onSelectTool: (tool: 'GENERATE' | 'CORRECT') => void;
 }
 
-const SummaryToolSelection: React.FC<SummaryToolSelectionProps> = ({ onBack, onStartCorrection, onStartAutomatic }) => {
+const SummaryToolSelection: React.FC<SummaryToolSelectionProps> = ({ onBack, onSelectTool }) => {
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto w-full">
       <div className="text-center">
@@ -18,7 +17,7 @@ const SummaryToolSelection: React.FC<SummaryToolSelectionProps> = ({ onBack, onS
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Generación Automática */}
         <button 
-          onClick={onStartAutomatic}
+          onClick={() => onSelectTool('GENERATE')}
           className="flex flex-col items-center p-10 bg-white border-2 border-emerald-100 rounded-[2.5rem] hover:border-emerald-500 hover:bg-emerald-50 transition-all group shadow-sm text-center active:scale-95"
         >
           <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform shadow-inner">
@@ -32,7 +31,7 @@ const SummaryToolSelection: React.FC<SummaryToolSelectionProps> = ({ onBack, onS
 
         {/* Corrección de Mi Resumen */}
         <button 
-          onClick={onStartCorrection}
+          onClick={() => onSelectTool('CORRECT')}
           className="flex flex-col items-center p-10 bg-white border-2 border-indigo-100 rounded-[2.5rem] hover:border-indigo-500 hover:bg-indigo-50 transition-all group shadow-sm text-center active:scale-95"
         >
           <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-4xl mb-6 group-hover:scale-110 transition-transform shadow-inner">
