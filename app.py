@@ -300,11 +300,13 @@ def callback():
     token = google.authorize_access_token()
     userinfo = token.get("userinfo") or google.userinfo()
     
-    # --- CORRECCIÓN 4: Uso de text() para consultas directas si fuera necesario ---
     u = Usuario.query.filter_by(email=userinfo["email"]).first()
     
     if not u:
-        total_users = Usuario.query.count()
+        # --- CORRECCIÓN DEFINITIVA E3Q8: Uso de text() para conteo en Neon ---
+        count_query = text("SELECT count(*) FROM usuario")
+        total_users = db.session.execute(count_query).scalar()
+        
         if total_users >= LIMITE_USUARIOS:
             return "Fase de prueba completa (50/50 usuarios).", 403
         u = Usuario(email=userinfo["email"])
