@@ -5,10 +5,10 @@ import { Target, Lightbulb, ArrowRight, RotateCcw } from 'lucide-react';
 
 interface SummaryGenerationResultsViewProps {
   result: SummaryGenerationResult;
-  onRestart: () => void;
+  onFinish: () => void; // Cambiado de onRestart a onFinish
 }
 
-const SummaryGenerationResultsView: React.FC<SummaryGenerationResultsViewProps> = ({ result, onRestart }) => {
+const SummaryGenerationResultsView: React.FC<SummaryGenerationResultsViewProps> = ({ result, onFinish }) => {
   return (
     <div className="space-y-10 animate-in fade-in zoom-in-95 duration-700 max-w-4xl mx-auto w-full pb-20">
       
@@ -83,7 +83,7 @@ const SummaryGenerationResultsView: React.FC<SummaryGenerationResultsViewProps> 
       {/* Botón para volver a empezar */}
       <div className="flex justify-center">
         <button 
-          onClick={onRestart}
+          onClick={onFinish}
           className="group px-10 py-5 bg-white border-2 border-slate-200 text-slate-800 font-black rounded-2xl hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-xl active:scale-95 flex items-center gap-3 uppercase tracking-widest text-xs"
         >
           <RotateCcw size={18} className="group-hover:rotate-180 transition-transform duration-500" />
@@ -95,3 +95,4 @@ const SummaryGenerationResultsView: React.FC<SummaryGenerationResultsViewProps> 
 };
 
 export default SummaryGenerationResultsView;
+        
