@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, BookOpen, Rocket, PenTool, History, Map } from 'lucide-react';
+import { Target, BookOpen, Rocket, PenTool, History, Map, Zap } from 'lucide-react';
 
 // Definimos qué datos necesita recibir este componente
 interface WelcomeProps {
@@ -17,6 +17,21 @@ const Welcome: React.FC<WelcomeProps> = ({
 }) => {
   return (
     <div className="text-center space-y-8 animate-in fade-in zoom-in-95 duration-700 py-10">
+      
+      {/* Badge de Créditos Disponibles */}
+      <div className="flex justify-center">
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm transition-all duration-500 ${
+          restantes > 0 
+          ? 'bg-emerald-50 border-emerald-100 text-emerald-700' 
+          : 'bg-amber-50 border-amber-100 text-amber-700'
+        }`}>
+          <Zap size={14} className={restantes > 0 ? 'fill-emerald-500' : 'fill-amber-500'} />
+          <span className="text-xs font-black uppercase tracking-widest">
+            {restantes > 0 ? `${restantes} Entrenamientos disponibles` : 'Sin consultas - Ver anuncio'}
+          </span>
+        </div>
+      </div>
+
       {/* Cabecera Principal */}
       <div className="space-y-4">
         <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-700 text-sm font-bold rounded-full border border-indigo-100 uppercase tracking-wider">
@@ -57,7 +72,7 @@ const Welcome: React.FC<WelcomeProps> = ({
           className="w-full sm:w-auto px-10 py-5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 transform transition active:scale-95 text-lg flex items-center gap-3"
         >
           <PenTool size={22} />
-          Comenzar Entrenamiento
+          {restantes > 0 ? 'Comenzar Entrenamiento' : 'Recargar Consultas'}
         </button>
         
         <div className="flex gap-4 w-full sm:w-auto">
@@ -79,15 +94,21 @@ const Welcome: React.FC<WelcomeProps> = ({
       </div>
 
       {/* Créditos Dinámicos (ADN app.py) */}
-      <div className="flex items-center justify-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-        <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
-          Entrenamientos disponibles hoy: {restantes}
-        </p>
+      <div className="flex flex-col items-center justify-center gap-2">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full animate-pulse ${restantes > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
+            Estado del sistema: {restantes > 0 ? 'Operativo' : 'Requiere recarga'}
+          </p>
+        </div>
+        {restantes === 0 && (
+          <p className="text-[9px] text-indigo-500 font-bold uppercase tracking-widest">
+            Usa una actividad para activar el desbloqueo por anuncio
+          </p>
+        )}
       </div>
     </div>
   );
 };
 
 export default Welcome;
-        
