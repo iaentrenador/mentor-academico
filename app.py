@@ -25,10 +25,12 @@ app = Flask(__name__, static_folder=dist_path, static_url_path='/')
 
 allowed_origins_raw = os.environ.get("ALLOWED_ORIGINS", "")
 if not allowed_origins_raw:
-    allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "https://mentor-academico-0cn1.onrender.com"]
 else:
     allowed_origins = [o.strip() for o in allowed_origins_raw.split(",")]
-CORS(app, origins=allowed_origins)
+
+# Agregamos supports_credentials=True para que las cookies de sesión funcionen con CORS
+CORS(app, origins=allowed_origins, supports_credentials=True)
 
 secret_key = os.environ.get("SECRET_KEY")
 if not secret_key:
@@ -37,21 +39,17 @@ app.secret_key = secret_key
 
 # --- CONFIGURACIÓN DE BASE DE DATOS ---
 basedir = os.path.abspath(os.path.dirname(__file__))
-# Priorizamos DATABASE_URL para la nueva conexión con Supabase
 db_uri_raw = os.environ.get("DATABASE_URL") or os.environ.get("NEONDB_OWNER")
 
 if not db_uri_raw:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
 else:
     db_uri = db_uri_raw.strip()
-    
-    # --- CORRECCIÓN DE PROTOCOLO PARA PG8000 Y POOLER ---
     if db_uri.startswith("postgres://"):
         db_uri = db_uri.replace("postgres://", "postgresql+pg8000://", 1)
     elif db_uri.startswith("postgresql://"):
         db_uri = db_uri.replace("postgresql://", "postgresql+pg8000://", 1)
     
-    # Limpieza de parámetros para asegurar compatibilidad con Supabase y pg8000
     if "?" in db_uri:
         db_uri = db_uri.split("?")[0]
 
@@ -62,7 +60,10 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 280,
     "connect_args": {"ssl": True}
 }
+# Aseguramos que la sesión dure y sea válida
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = True
 
 # --- CONFIGURACIÓN DE CORREO (Flask-Mail) ---
 app.config.update(
@@ -74,9 +75,7 @@ app.config.update(
     MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD"),
 )
 
-# --- RESTAURADO: Inicialización de correo ---
 mail = Mail(app) 
-
 db = SQLAlchemy(app)
 
 oauth = OAuth(app)
@@ -101,21 +100,17 @@ TAREAS_VALIDAS = {
     "corregir_escrito", "corregir_resumen", "explicar_concepto", "evaluar_simulacro",
     "generar_resumen", "math_explain", "math_correct"
 }
-MAX_TEXTO, MAX_MATERIAL, PERFIL_MAX = 15_000, 50_000, 3_000
-
 CONSULTAS_BASE = 4 
-TIEMPO_MIN_AD = 15 
 ADSTERRA_URL = "https://www.profitablecpmratenetwork.com/n2r78m21y?key=53d8cbd50aefa22ac6dd367853c1809e"
 LIMITE_USUARIOS = 50
 
-ACADEMIC_COACH_PERSONA = """Eres un entrenador académico universitario especializado en comprensión de textos y desarrollo conceptual.
-Tu objetivo no es hacer las tareas por el estudiante, sino entrenar su pensamiento académico."""
+ACADEMIC_COACH_PERSONA = """Eres un entrenador académico universitario especializado en comprensión de textos y desarrollo conceptual."""
 
 PERFILES_MATERIA = {
-    "higiene_upe": "ROL: Inspector Técnico de Higiene y Seguridad (UPE). REGLA: Exige rigor en Ley 19587 y Decretos 351/911.",
-    "politica_upe": "ROL: Mentor de Política y Sociedad (UPE). REGLA: Usa conceptos de Estado, Poder y Ciudadanía.",
-    "alfabetizacion_upe": "ROL: Especialista en Alfabetización Académica (UPE). REGLA: Evalúa cohesión y normas APA.",
-    "abogacia_unlz": "ROL: Profesor de la Facultad de Derecho UNLZ. Rigor jurídico máximo (Código Civil y Comercial).",
+    "higiene_upe": "ROL: Inspector Técnico de Higiene y Seguridad (UPE).",
+    "politica_upe": "ROL: Mentor de Política y Sociedad (UPE).",
+    "alfabetizacion_upe": "ROL: Especialista en Alfabetización Académica (UPE).",
+    "abogacia_unlz": "ROL: Profesor de la Facultad de Derecho UNLZ.",
 }
 
 # --- MODELO ---
@@ -140,7 +135,8 @@ except Exception as e:
 # --- HELPERS ---
 def get_usuario_actual():
     uid = session.get("usuario_id")
-    return db.session.get(Usuario, uid) if uid else None
+    if not uid: return None
+    return db.session.get(Usuario, uid)
 
 def resetear_si_nuevo_dia(u):
     ahora = datetime.datetime.now(datetime.timezone.utc)
@@ -156,68 +152,29 @@ def resetear_si_nuevo_dia(u):
 
 def consultas_permitidas(u):
     total = CONSULTAS_BASE
-    if u.bloques_publicidad_vistos >= 1:
-        total += 3
-    if u.bloques_publicidad_vistos >= 2:
-        total += 2
+    if u.bloques_publicidad_vistos >= 1: total += 3
+    if u.bloques_publicidad_vistos >= 2: total += 2
     return total + u.creditos_comprados
 
 def tiene_saldo(u):
     return u.consultas_usadas < consultas_permitidas(u)
 
-# --- IA LOGIC ---
-def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consigna="", query=""):
-    perfil_materia = PERFILES_MATERIA.get(materia, "ROL: Mentor Académico Universitario.")
-    response_format = {"type": "text"}
-    prompt_sistema = f"{ACADEMIC_COACH_PERSONA}\n{perfil_materia}"
-
-    if tarea == "explicar_concepto":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{"explanation": "...", "examples": [], "keyTakeaways": [], "relatedConcepts": []}}"""
-        content = f"MATERIAL DE ESTUDIO: {texto}\nDUDA ESPECÍFICA DEL ALUMNO: {query}\nCONTEXTO ADICIONAL: {material}"
-        response_format = {"type": "json_object"}
-    elif tarea == "generar_resumen":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{"title": "...", "executiveSummary": "...", "keyConcepts": [{{"concept": "...", "definition": "..."}}], "conclusions": "..."}}"""
-        content = f"TITULO SUGERIDO: {query}\nCONTENIDO PARA RESUMIR: {texto}"
-        response_format = {"type": "json_object"}
-    elif tarea == "corregir_resumen":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{"grade": 0, "status": "Excelente/Satisfactorio/Insuficiente", "performanceAnalysis": "...", "strengths": [], "weaknesses": [], "omissions": [], "improvementSuggestions": [], "suggestedRetry": "...", "improvedVersion": "..."}}"""
-        content = f"TEXTO FUENTE: {texto}\nRESUMEN DEL ALUMNO: {query}"
-        response_format = {"type": "json_object"}
-    elif tarea == "corregir_escrito":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{ "grade": 0, "status": "...", "performanceAnalysis": "...", "strengths": [], "weaknesses": [], "improvementSuggestions": [], "suggestedRetry": "...", "criteria": {{ "understanding": {{"score": 0, "feedback": "..."}}, "promptAdequacy": {{"score": 0, "feedback": "..."}}, "coherence": {{"score": 0, "feedback": "..."}}, "vocabulary": {{"score": 0, "feedback": "..."}}, "fundamentation": {{"score": 0, "feedback": "..."}} }}, "qualitative": {{ "strengths": [], "weaknesses": [], "conceptualErrors": [] }} }}"""
-        content = f"CONSIGNA: {consigna}\nMATERIAL DE CONSULTA: {material if material else 'No proporcionado'}\nESCRITO DEL ESTUDIANTE: {texto}"
-        response_format = {"type": "json_object"}
-    elif tarea == "generar_red":
-        prompt_sistema = f"""{ACADEMIC_COACH_PERSONA}\n{perfil_materia}\nResponde ÚNICAMENTE con este JSON: {{ "title": "...", "summary": "...", "nodes": [], "edges": [] }}"""
-        content = f"TEXTO A MAPEAR: {texto}"
-        response_format = {"type": "json_object"}
-    elif tarea == "generar_examen":
-        prompt_sistema = f"""{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{ "questions": [ {{ "id": "1", "question": "...", "type": "multiple-choice", "options": [] }} ] }}"""
-        content = f"MATERIAL DE ESTUDIO: {material if material else texto}\nTIPOS PEDIDOS: {consigna}\nCANTIDAD: {query}"
-        response_format = {"type": "json_object"}
-    elif tarea == "evaluar_simulacro":
-        prompt_sistema = f"""{perfil_materia}\nResponde ESTRICTAMENTE con este JSON: {{ "grade": 0, "status": "...", "questionEvaluations": [] }}"""
-        content = f"MATERIAL ORIGINAL: {material}\nRESPUESTAS DEL ALUMNO: {texto}"
-        response_format = {"type": "json_object"}
-    elif tarea == "math_explain":
-        prompt_sistema = """Eres un profesor de matemáticas de la UPE... Responde ESTRICTAMENTE con este JSON."""
-        content = f"TEMA: {query}\nEJERCICIO ORIGINAL: {texto}"
-        response_format = {"type": "json_object"}
-    elif tarea == "math_correct":
-        prompt_sistema = """Eres el Instructor de Matemáticas de la UPE... Responde ESTRICTAMENTE con este JSON."""
-        content = f"CONSIGNA: {consigna}\nRESOLUCIÓN DEL ALUMNO: {texto}"
-        response_format = {"type": "json_object"}
-    else:
-        content = f"CONTEXTO: {material}\nACCIÓN: {tarea}\nENTRADA: {texto}"
-
-    try:
-        completion = client.chat.completions.create(model=MODEL_ID, messages=[{"role": "system", "content": prompt_sistema}, {"role": "user", "content": content}], temperature=0.7, response_format=response_format)
-        return completion.choices[0].message.content
-    except Exception as e:
-        logger.error("Error IA: %s", repr(e))
-        return None
-
 # --- RUTAS DE API ---
+
+@app.route("/api/usuario")
+def info_usuario():
+    u = get_usuario_actual()
+    if not u: 
+        return jsonify({"logueado": False, "restantes": 0, "total_hoy": 0})
+    resetear_si_nuevo_dia(u)
+    return jsonify({
+        "logueado": True,
+        "email": u.email,
+        "restantes": max(0, consultas_permitidas(u) - u.consultas_usadas),
+        "total_hoy": consultas_permitidas(u),
+        "bloques_ad": u.bloques_publicidad_vistos,
+        "url_ad": ADSTERRA_URL
+    })
 
 @app.route("/api/registrar_ad", methods=["POST"])
 def registrar_ad():
@@ -229,83 +186,9 @@ def registrar_ad():
         return jsonify({
             "success": True, 
             "restantes": consultas_permitidas(u) - u.consultas_usadas,
-            "url_ad": ADSTERRA_URL,
-            "espera": TIEMPO_MIN_AD
+            "url_ad": ADSTERRA_URL
         })
-    return jsonify({"error": "Límite diario de anuncios alcanzado"}), 400
-
-@app.route("/api/usuario")
-def info_usuario():
-    u = get_usuario_actual()
-    if not u: return jsonify({"logueado": False})
-    resetear_si_nuevo_dia(u)
-    return jsonify({
-        "logueado": True,
-        "email": u.email,
-        "restantes": max(0, consultas_permitidas(u) - u.consultas_usadas),
-        "total_hoy": consultas_permitidas(u),
-        "bloques_ad": u.bloques_publicidad_vistos,
-        "url_ad": ADSTERRA_URL,
-        "limite_alcanzado": u.bloques_publicidad_vistos >= 2
-    })
-
-@app.route("/api/exam/generate", methods=["POST"])
-def api_generate_exam():
-    u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
-    if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
-    data = request.json
-    res = ejecutar_tarea_ia("generar_examen", data.get("material", ""), "", u, 
-                            materia=data.get("materia", "general"),
-                            consigna=json.dumps(data.get("questionTypes")),
-                            query=str(data.get("questionCount")))
-    if not res: return jsonify({"error": "Error IA"}), 500
-    u.consultas_usadas += 1
-    u.ultima_consulta = datetime.datetime.now(datetime.timezone.utc)
-    db.session.commit()
-    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
-
-@app.route("/api/generar_resumen", methods=["POST"])
-def api_generar_resumen():
-    u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
-    if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
-    data = request.json
-    res = ejecutar_tarea_ia("generar_resumen", data.get("content", ""), "", u, query=data.get("title", ""))
-    if not res: return jsonify({"error": "Error IA"}), 500
-    u.consultas_usadas += 1
-    u.ultima_consulta = datetime.datetime.now(datetime.timezone.utc)
-    db.session.commit()
-    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
-
-@app.route("/api/generar_red", methods=["POST"])
-def api_generar_red():
-    u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
-    if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
-    data = request.json
-    res = ejecutar_tarea_ia("generar_red", data.get("texto", ""), "", u, materia=data.get("materia", "general"))
-    if not res: return jsonify({"error": "Error IA"}), 500
-    u.consultas_usadas += 1
-    u.ultima_consulta = datetime.datetime.now(datetime.timezone.utc)
-    db.session.commit()
-    return jsonify({"resultado": json.loads(res), "restantes": consultas_permitidas(u) - u.consultas_usadas})
-
-@app.route("/api/<tarea>", methods=["POST"])
-def manejar_tarea(tarea):
-    if tarea not in TAREAS_VALIDAS: return jsonify({"error": "Tarea inválida"}), 400
-    u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
-    if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
-    data = request.get_json(silent=True) or {}
-    texto = data.get("writing", data.get("texto", "")).strip()
-    materia = data.get("materia", "general")
-    res = ejecutar_tarea_ia(tarea, texto, u.material, u, materia)
-    if res is None: return jsonify({"error": "Error IA"}), 503
-    u.consultas_usadas += 1
-    u.ultima_consulta = datetime.datetime.now(datetime.timezone.utc)
-    db.session.commit()
-    return jsonify({"resultado": json.loads(res) if tarea in ["generar_examen", "generar_rap"] else res})
+    return jsonify({"error": "Límite alcanzado"}), 400
 
 # --- NAVEGACIÓN Y AUTH ---
 @app.route("/")
@@ -320,13 +203,11 @@ def callback():
     userinfo = token.get("userinfo") or google.userinfo()
     u = Usuario.query.filter_by(email=userinfo["email"]).first()
     if not u:
-        total_users = db.session.execute(text("SELECT count(*) FROM usuario")).scalar()
-        if total_users >= LIMITE_USUARIOS:
-            return "Fase de prueba completa.", 403
         u = Usuario(email=userinfo["email"])
         db.session.add(u)
     db.session.commit()
     session["usuario_id"] = u.id
+    session.permanent = True
     return redirect("/")
 
 @app.route("/logout")
@@ -335,5 +216,4 @@ def logout():
     return redirect("/")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
