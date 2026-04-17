@@ -37,7 +37,8 @@ app.secret_key = secret_key
 
 # --- CONFIGURACIÓN DE BASE DE DATOS ---
 basedir = os.path.abspath(os.path.dirname(__file__))
-db_uri_raw = os.environ.get("NEONDB_OWNER") or os.environ.get("DATABASE_URL")
+# Priorizamos DATABASE_URL para la nueva conexión con Supabase
+db_uri_raw = os.environ.get("DATABASE_URL") or os.environ.get("NEONDB_OWNER")
 
 if not db_uri_raw:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
@@ -50,18 +51,16 @@ else:
     elif db_uri.startswith("postgresql://"):
         db_uri = db_uri.replace("postgresql://", "postgresql+pg8000://", 1)
     
-    # Limpieza de parámetros para asegurar compatibilidad con el Pooler de Neon
+    # Limpieza de parámetros para asegurar compatibilidad con Supabase y pg8000
     if "?" in db_uri:
-        base_url = db_uri.split("?")[0]
-        db_uri = f"{base_url}?sslmode=require"
-    else:
-        db_uri += "?sslmode=require"
+        db_uri = db_uri.split("?")[0]
 
 app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
     "pool_recycle": 280,
+    "connect_args": {"ssl": True}
 }
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
 
