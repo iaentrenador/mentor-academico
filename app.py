@@ -44,14 +44,18 @@ if not db_uri_raw:
 else:
     db_uri = db_uri_raw.strip()
     
-    # --- CORRECCIÓN DE PROTOCOLO PARA PG8000 ---
+    # --- CORRECCIÓN DE PROTOCOLO PARA PG8000 Y POOLER ---
     if db_uri.startswith("postgres://"):
         db_uri = db_uri.replace("postgres://", "postgresql+pg8000://", 1)
     elif db_uri.startswith("postgresql://"):
         db_uri = db_uri.replace("postgresql://", "postgresql+pg8000://", 1)
     
-    if "sslmode" not in db_uri:
-        db_uri += "&sslmode=require" if "?" in db_uri else "?sslmode=require"
+    # Limpieza de parámetros para asegurar compatibilidad con el Pooler de Neon
+    if "?" in db_uri:
+        base_url = db_uri.split("?")[0]
+        db_uri = f"{base_url}?sslmode=require"
+    else:
+        db_uri += "?sslmode=require"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
