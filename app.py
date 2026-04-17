@@ -43,8 +43,12 @@ if not db_uri_raw:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
 else:
     db_uri = db_uri_raw.strip()
+    
+    # --- CORRECCIÓN DE PROTOCOLO PARA PG8000 ---
     if db_uri.startswith("postgres://"):
-        db_uri = db_uri.replace("postgres://", "postgresql://", 1)
+        db_uri = db_uri.replace("postgres://", "postgresql+pg8000://", 1)
+    elif db_uri.startswith("postgresql://"):
+        db_uri = db_uri.replace("postgresql://", "postgresql+pg8000://", 1)
     
     if "sslmode" not in db_uri:
         db_uri += "&sslmode=require" if "?" in db_uri else "?sslmode=require"
@@ -67,8 +71,8 @@ app.config.update(
     MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD"),
 )
 
-# --- PRUEBA DE DIAGNÓSTICO: Comentamos la inicialización ---
-# mail = Mail(app) 
+# --- RESTAURADO: Inicialización de correo ---
+mail = Mail(app) 
 
 db = SQLAlchemy(app)
 
