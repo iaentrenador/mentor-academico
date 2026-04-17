@@ -66,7 +66,10 @@ app.config.update(
     MAIL_USERNAME=os.environ.get("MAIL_USERNAME"),
     MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD"),
 )
-mail = Mail(app)
+
+# --- PRUEBA DE DIAGNÓSTICO: Comentamos la inicialización ---
+# mail = Mail(app) 
+
 db = SQLAlchemy(app)
 
 oauth = OAuth(app)
