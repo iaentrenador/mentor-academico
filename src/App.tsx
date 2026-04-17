@@ -22,7 +22,7 @@ import ExamInputView from './components/ExamInputView';
 import ExamTakingView from './components/ExamTakingView';
 import ExamResultsView from './components/ExamResultsView';
 import { examService } from './services/examService';
-import { BookOpen, ChevronLeft, ExternalLink, Clock, CheckCircle2 } from 'lucide-react';
+import { BookOpen, ChevronLeft, ExternalLink, Clock, CheckCircle2, LogIn, LogOut, User } from 'lucide-react';
 
 enum MathAppState {
   MATH_EXPLAINER_INPUT = 'MATH_EXPLAINER_INPUT',
@@ -34,7 +34,7 @@ enum MathAppState {
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | MathAppState | string>(AppState.WELCOME);
   const [loading, setLoading] = useState(false);
-  const [userStats, setUserStats] = useState({ logueado: false, restantes: 0, url_ad: '', bloques_ad: 0 });
+  const [userStats, setUserStats] = useState({ logueado: false, email: '', restantes: 0, url_ad: '', bloques_ad: 0 });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
   const [showAdModal, setShowAdModal] = useState(false);
@@ -99,6 +99,10 @@ const App: React.FC = () => {
   };
 
   const checkCredits = () => {
+    if (!userStats.logueado) {
+      window.location.href = "/login";
+      return false;
+    }
     if (userStats.restantes <= 0) {
       setShowAdModal(true);
       return false;
@@ -372,21 +376,62 @@ const App: React.FC = () => {
       )}
 
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-200">
-            <BookOpen size={18} />
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-200">
+              <BookOpen size={18} />
+            </div>
+            <h1 className="font-black text-slate-800 text-lg tracking-tighter uppercase italic">MENTOR IA</h1>
           </div>
-          <h1 className="font-black text-slate-800 text-lg tracking-tighter uppercase italic">MENTOR IA</h1>
+
+          {userStats.logueado && (
+            <div className="hidden md:flex items-center gap-3 px-4 py-1.5 bg-slate-50 border border-slate-200 rounded-full">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> CONSULTAS:
+              </div>
+              <div className="flex gap-1">
+                {[...Array(userStats.total_hoy || 4)].map((_, i) => (
+                  <div key={i} className={`w-2 h-2 rounded-full ${i < userStats.restantes ? 'bg-indigo-500' : 'bg-slate-200'}`} />
+                ))}
+              </div>
+              <span className="text-xs font-bold text-indigo-600">{userStats.restantes} DISPONIBLES</span>
+            </div>
+          )}
         </div>
         
-        {state !== AppState.WELCOME && (
-          <button 
-            onClick={() => { setResultado(null); setNetworkResult(null); setState(AppState.WELCOME); }}
-            className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-all text-xs font-black uppercase tracking-widest"
-          >
-            <ChevronLeft size={16} strokeWidth={3} /> VOLVER
-          </button>
-        )}
+        <div className="flex items-center gap-4">
+          {state !== AppState.WELCOME && (
+            <button 
+              onClick={() => { setResultado(null); setNetworkResult(null); setState(AppState.WELCOME); }}
+              className="flex items-center gap-1 text-slate-500 hover:text-indigo-600 transition-all text-xs font-black uppercase tracking-widest mr-4"
+            >
+              <ChevronLeft size={16} strokeWidth={3} /> VOLVER
+            </button>
+          )}
+
+          {userStats.logueado ? (
+            <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+              <div className="text-right hidden sm:block">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Estudiante</p>
+                <p className="text-xs font-bold text-slate-700">{userStats.email}</p>
+              </div>
+              <a 
+                href="/logout" 
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100"
+                title="Cerrar Sesión"
+              >
+                <LogOut size={18} />
+              </a>
+            </div>
+          ) : (
+            <a 
+              href="/login" 
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-100"
+            >
+              <LogIn size={16} /> INGRESAR
+            </a>
+          )}
+        </div>
       </header>
 
       <main className="flex-1 flex flex-col w-full max-w-6xl mx-auto p-6">
@@ -508,4 +553,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
