@@ -6,9 +6,10 @@ from groq import Groq
 from flask import Flask, request, jsonify, session, redirect, url_for, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text  # <--- CORRECCIÓN 1: Importar text
+from sqlalchemy import text
 from authlib.integrations.flask_client import OAuth
-from flask_mail import Mail, Message
+# --- CORRECCIÓN: Migración a Flask-Mailing para compatibilidad con Flask 3.x ---
+from flask_mailing import Mail, Message
 
 # --- CONFIGURACIÓN E INFRAESTRUCTURA ---
 logging.basicConfig(level=logging.INFO)
@@ -34,25 +35,19 @@ if not secret_key:
     secret_key = "dev_secret_key_provisional"
 app.secret_key = secret_key
 
-# --- CORRECCIÓN 2: Puente NEONDB_OWNER con limpieza de espacios ---
+# --- CONFIGURACIÓN DE BASE DE DATOS ---
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_uri_raw = os.environ.get("NEONDB_OWNER") or os.environ.get("DATABASE_URL")
 
 if not db_uri_raw:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
 else:
-    # Aplicamos .strip() para eliminar espacios o saltos de línea accidentales
     db_uri = db_uri_raw.strip()
-    
-    # Ajuste para SQLAlchemy 2.0 y SSL de Neon
     if db_uri.startswith("postgres://"):
         db_uri = db_uri.replace("postgres://", "postgresql://", 1)
     
     if "sslmode" not in db_uri:
-        if "?" in db_uri:
-            db_uri += "&sslmode=require"
-        else:
-            db_uri += "?sslmode=require"
+        db_uri += "&sslmode=require" if "?" in db_uri else "?sslmode=require"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -62,10 +57,12 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
 
+# --- CONFIGURACIÓN DE CORREO (Flask-Mailing) ---
 app.config.update(
     MAIL_SERVER=os.environ.get("MAIL_SERVER", "smtp.gmail.com"),
     MAIL_PORT=int(os.environ.get("MAIL_PORT", 587)),
     MAIL_USE_TLS=True,
+    MAIL_USE_SSL=False,
     MAIL_USERNAME=os.environ.get("MAIL_USERNAME"),
     MAIL_PASSWORD=os.environ.get("MAIL_PASSWORD"),
 )
@@ -102,8 +99,7 @@ ADSTERRA_URL = "https://www.profitablecpmratenetwork.com/n2r78m21y?key=53d8cbd50
 LIMITE_USUARIOS = 50
 
 ACADEMIC_COACH_PERSONA = """Eres un entrenador académico universitario especializado en comprensión de textos y desarrollo conceptual.
-Tu objetivo no es hacer las tareas por el estudiante, sino entrenar su pensamiento académico.
-Comportate como un docente universitario que evalúa y orienta el aprendizaje."""
+Tu objetivo no es hacer las tareas por el estudiante, sino entrenar su pensamiento académico."""
 
 PERFILES_MATERIA = {
     "higiene_upe": "ROL: Inspector Técnico de Higiene y Seguridad (UPE). REGLA: Exige rigor en Ley 19587 y Decretos 351/911.",
@@ -123,7 +119,7 @@ class Usuario(db.Model):
     material = db.Column(db.Text, default="")
     perfil_aprendizaje = db.Column(db.Text, default="{}")
 
-# --- CORRECCIÓN 3: Inicialización segura de BD ---
+# --- INICIALIZACIÓN DE BD ---
 with app.app_context():
     db.create_all()
     logger.info("Base de datos verificada/creada.")
@@ -214,7 +210,6 @@ def ejecutar_tarea_ia(tarea, texto, material, usuario, materia="general", consig
 def registrar_ad():
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
-    
     if u.bloques_publicidad_vistos < 2:
         u.bloques_publicidad_vistos += 1
         db.session.commit()
@@ -246,7 +241,6 @@ def api_generate_exam():
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
     if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
-    
     data = request.json
     res = ejecutar_tarea_ia("generar_examen", data.get("material", ""), "", u, 
                             materia=data.get("materia", "general"),
@@ -263,7 +257,6 @@ def api_generar_resumen():
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
     if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
-    
     data = request.json
     res = ejecutar_tarea_ia("generar_resumen", data.get("content", ""), "", u, query=data.get("title", ""))
     if not res: return jsonify({"error": "Error IA"}), 500
@@ -277,7 +270,6 @@ def api_generar_red():
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
     if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
-    
     data = request.json
     res = ejecutar_tarea_ia("generar_red", data.get("texto", ""), "", u, materia=data.get("materia", "general"))
     if not res: return jsonify({"error": "Error IA"}), 500
@@ -292,7 +284,6 @@ def manejar_tarea(tarea):
     u = get_usuario_actual()
     if not u: return jsonify({"error": "No autenticado"}), 401
     if not tiene_saldo(u): return jsonify({"error": "Consultas agotadas"}), 403
-    
     data = request.get_json(silent=True) or {}
     texto = data.get("writing", data.get("texto", "")).strip()
     materia = data.get("materia", "general")
@@ -314,19 +305,13 @@ def login(): return google.authorize_redirect(url_for("callback", _external=True
 def callback():
     token = google.authorize_access_token()
     userinfo = token.get("userinfo") or google.userinfo()
-    
     u = Usuario.query.filter_by(email=userinfo["email"]).first()
-    
     if not u:
-        # --- CORRECCIÓN DEFINITIVA E3Q8 ---
-        count_query = text("SELECT count(*) FROM usuario")
-        total_users = db.session.execute(count_query).scalar()
-        
+        total_users = db.session.execute(text("SELECT count(*) FROM usuario")).scalar()
         if total_users >= LIMITE_USUARIOS:
-            return "Fase de prueba completa (50/50 usuarios).", 403
+            return "Fase de prueba completa.", 403
         u = Usuario(email=userinfo["email"])
         db.session.add(u)
-    
     db.session.commit()
     session["usuario_id"] = u.id
     return redirect("/")
