@@ -130,9 +130,12 @@ class Usuario(db.Model):
     perfil_aprendizaje = db.Column(db.Text, default="{}")
 
 # --- INICIALIZACIÓN DE BD ---
-with app.app_context():
-    db.create_all()
-    logger.info("Base de datos verificada/creada.")
+try:
+    with app.app_context():
+        db.create_all()
+        logger.info("Base de datos verificada/creada.")
+except Exception as e:
+    logger.error("Error al conectar/crear la base de datos: %s", repr(e))
 
 # --- HELPERS ---
 def get_usuario_actual():
