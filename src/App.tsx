@@ -34,7 +34,15 @@ enum MathAppState {
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | MathAppState | string>(AppState.WELCOME);
   const [loading, setLoading] = useState(false);
-  const [userStats, setUserStats] = useState({ logueado: false, email: '', restantes: 0, url_ad: '', bloques_ad: 0 });
+  // CORRECCIÓN: Se añade 'total_hoy' al estado inicial para evitar error TS2339
+  const [userStats, setUserStats] = useState({ 
+    logueado: false, 
+    email: '', 
+    restantes: 0, 
+    url_ad: '', 
+    bloques_ad: 0,
+    total_hoy: 4 
+  });
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   
   const [showAdModal, setShowAdModal] = useState(false);
