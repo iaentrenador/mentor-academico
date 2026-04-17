@@ -34,17 +34,20 @@ if not secret_key:
     secret_key = "dev_secret_key_provisional"
 app.secret_key = secret_key
 
-# --- CORRECCIÓN 2: Puente NEONDB_OWNER y compatibilidad PostgreSQL ---
+# --- CORRECCIÓN 2: Puente NEONDB_OWNER con limpieza de espacios ---
 basedir = os.path.abspath(os.path.dirname(__file__))
-# Intentamos obtener la variable que Render sí nos dejó guardar
-db_uri = os.environ.get("NEONDB_OWNER") or os.environ.get("DATABASE_URL")
+db_uri_raw = os.environ.get("NEONDB_OWNER") or os.environ.get("DATABASE_URL")
 
-if not db_uri:
+if not db_uri_raw:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
 else:
+    # Aplicamos .strip() para eliminar espacios o saltos de línea accidentales
+    db_uri = db_uri_raw.strip()
+    
     # Ajuste para SQLAlchemy 2.0 y SSL de Neon
     if db_uri.startswith("postgres://"):
         db_uri = db_uri.replace("postgres://", "postgresql://", 1)
+    
     if "sslmode" not in db_uri:
         if "?" in db_uri:
             db_uri += "&sslmode=require"
