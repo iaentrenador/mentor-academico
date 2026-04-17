@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, BookOpen, Rocket, PenTool, History, Map, Zap } from 'lucide-react';
+import { Target, BookOpen, Rocket, PenTool, History, Map, Zap, LogIn } from 'lucide-react';
 
 // Definimos qué datos necesita recibir este componente
 interface WelcomeProps {
@@ -15,19 +15,22 @@ const Welcome: React.FC<WelcomeProps> = ({
   onViewCognitiveMap, 
   restantes 
 }) => {
+  // Verificamos si el usuario tiene acceso (más de 0 consultas)
+  const tieneConsultas = restantes > 0;
+
   return (
     <div className="text-center space-y-8 animate-in fade-in zoom-in-95 duration-700 py-10">
       
       {/* Badge de Créditos Disponibles */}
       <div className="flex justify-center">
         <div className={`flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm transition-all duration-500 ${
-          restantes > 0 
+          tieneConsultas 
           ? 'bg-emerald-50 border-emerald-100 text-emerald-700' 
           : 'bg-amber-50 border-amber-100 text-amber-700'
         }`}>
-          <Zap size={14} className={restantes > 0 ? 'fill-emerald-500' : 'fill-amber-500'} />
+          <Zap size={14} className={tieneConsultas ? 'fill-emerald-500' : 'fill-amber-500'} />
           <span className="text-xs font-black uppercase tracking-widest">
-            {restantes > 0 ? `${restantes} Entrenamientos disponibles` : 'Sin consultas - Ver anuncio'}
+            {tieneConsultas ? `${restantes} Entrenamientos disponibles` : 'Identifícate para comenzar'}
           </span>
         </div>
       </div>
@@ -69,10 +72,14 @@ const Welcome: React.FC<WelcomeProps> = ({
       <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-4 px-6">
         <button 
           onClick={onStart}
-          className="w-full sm:w-auto px-10 py-5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 transform transition active:scale-95 text-lg flex items-center gap-3"
+          className={`w-full sm:w-auto px-10 py-5 font-black rounded-2xl shadow-xl transform transition active:scale-95 text-lg flex items-center justify-center gap-3 ${
+            tieneConsultas 
+            ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200' 
+            : 'bg-slate-800 hover:bg-slate-900 text-white shadow-slate-200'
+          }`}
         >
-          <PenTool size={22} />
-          {restantes > 0 ? 'Comenzar Entrenamiento' : 'Recargar Consultas'}
+          {tieneConsultas ? <PenTool size={22} /> : <LogIn size={22} />}
+          {tieneConsultas ? 'Comenzar Entrenamiento' : 'Ingresar con Google'}
         </button>
         
         <div className="flex gap-4 w-full sm:w-auto">
@@ -96,14 +103,14 @@ const Welcome: React.FC<WelcomeProps> = ({
       {/* Créditos Dinámicos (ADN app.py) */}
       <div className="flex flex-col items-center justify-center gap-2">
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full animate-pulse ${restantes > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+          <div className={`w-2 h-2 rounded-full animate-pulse ${tieneConsultas ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
           <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
-            Estado del sistema: {restantes > 0 ? 'Operativo' : 'Requiere recarga'}
+            Estado del sistema: {tieneConsultas ? 'Operativo' : 'Sesión requerida'}
           </p>
         </div>
-        {restantes === 0 && (
+        {!tieneConsultas && (
           <p className="text-[9px] text-indigo-500 font-bold uppercase tracking-widest">
-            Usa una actividad para activar el desbloqueo por anuncio
+            Inicia sesión para recibir tus 4 consultas diarias gratuitas
           </p>
         )}
       </div>
