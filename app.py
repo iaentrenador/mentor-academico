@@ -31,20 +31,32 @@ CORS(app, origins=allowed_origins)
 
 secret_key = os.environ.get("SECRET_KEY")
 if not secret_key:
-    # Fallback para desarrollo local si no hay variable de entorno
     secret_key = "dev_secret_key_provisional"
 app.secret_key = secret_key
 
-# --- CORRECCIÓN 2: Asegurar ruta local para SQLite ---
+# --- CORRECCIÓN 2: Puente NEONDB_OWNER y compatibilidad PostgreSQL ---
 basedir = os.path.abspath(os.path.dirname(__file__))
-db_path = os.environ.get("DATABASE_URL")
-if not db_path:
-    db_path = 'sqlite:///' + os.path.join(basedir, 'local.db')
-else:
-    db_path = db_path.replace("postgres://", "postgresql://", 1)
+# Intentamos obtener la variable que Render sí nos dejó guardar
+db_uri = os.environ.get("NEONDB_OWNER") or os.environ.get("DATABASE_URL")
 
-app.config["SQLALCHEMY_DATABASE_URI"] = db_path
+if not db_uri:
+    db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
+else:
+    # Ajuste para SQLAlchemy 2.0 y SSL de Neon
+    if db_uri.startswith("postgres://"):
+        db_uri = db_uri.replace("postgres://", "postgresql://", 1)
+    if "sslmode" not in db_uri:
+        if "?" in db_uri:
+            db_uri += "&sslmode=require"
+        else:
+            db_uri += "?sslmode=require"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 280,
+}
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
 
 app.config.update(
@@ -303,7 +315,7 @@ def callback():
     u = Usuario.query.filter_by(email=userinfo["email"]).first()
     
     if not u:
-        # --- CORRECCIÓN DEFINITIVA E3Q8: Uso de text() para conteo en Neon ---
+        # --- CORRECCIÓN DEFINITIVA E3Q8 ---
         count_query = text("SELECT count(*) FROM usuario")
         total_users = db.session.execute(count_query).scalar()
         
