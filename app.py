@@ -8,8 +8,8 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from authlib.integrations.flask_client import OAuth
-# --- CORRECCIÓN: Migración a Flask-Mailing para compatibilidad con Flask 3.x ---
-from flask_mailing import Mail, Message
+# --- CORRECCIÓN: Volvemos a Flask-Mail para evitar conflictos de dependencias en Render ---
+from flask_mail import Mail, Message
 
 # --- CONFIGURACIÓN E INFRAESTRUCTURA ---
 logging.basicConfig(level=logging.INFO)
@@ -65,7 +65,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
 
-# --- CONFIGURACIÓN DE CORREO (Flask-Mailing) ---
+# --- CONFIGURACIÓN DE CORREO (Flask-Mail) ---
 app.config.update(
     MAIL_SERVER=os.environ.get("MAIL_SERVER", "smtp.gmail.com"),
     MAIL_PORT=int(os.environ.get("MAIL_PORT", 587)),
