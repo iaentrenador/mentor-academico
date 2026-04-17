@@ -12,3 +12,5 @@ gunicorn==21.2.0
 pg8000==1.30.3
 Flask-Mailing==0.1.0
 itsdangerous==2.1.2
+aioredis==2.0.1
+redis==5.0.1
