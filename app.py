@@ -136,6 +136,7 @@ except Exception as e:
 def get_usuario_actual():
     uid = session.get("usuario_id")
     if not uid: return None
+    # Usamos session.get para evitar errores si la sesión es vieja
     return db.session.get(Usuario, uid)
 
 def resetear_si_nuevo_dia(u):
@@ -155,9 +156,6 @@ def consultas_permitidas(u):
     if u.bloques_publicidad_vistos >= 1: total += 3
     if u.bloques_publicidad_vistos >= 2: total += 2
     return total + u.creditos_comprados
-
-def tiene_saldo(u):
-    return u.consultas_usadas < consultas_permitidas(u)
 
 # --- RUTAS DE API ---
 
@@ -195,20 +193,35 @@ def registrar_ad():
 def index(): return send_from_directory(app.static_folder, "index.html")
 
 @app.route("/login")
-def login(): return google.authorize_redirect(url_for("callback", _external=True))
+def login(): 
+    # Forzamos la URL de callback correcta que pusimos en Google Console
+    redirect_uri = url_for("callback", _external=True)
+    return google.authorize_redirect(redirect_uri)
 
 @app.route("/callback")
 def callback():
-    token = google.authorize_access_token()
-    userinfo = token.get("userinfo") or google.userinfo()
-    u = Usuario.query.filter_by(email=userinfo["email"]).first()
-    if not u:
-        u = Usuario(email=userinfo["email"])
-        db.session.add(u)
-    db.session.commit()
-    session["usuario_id"] = u.id
-    session.permanent = True
-    return redirect("/")
+    try:
+        token = google.authorize_access_token()
+        # CORRECCIÓN: Obtenemos el usuario de forma más segura para evitar Error 500
+        userinfo = token.get("userinfo")
+        if not userinfo:
+            userinfo = google.get('https://www.googleapis.com/oauth2/v3/userinfo').json()
+        
+        email = userinfo.get("email")
+        u = Usuario.query.filter_by(email=email).first()
+        
+        if not u:
+            u = Usuario(email=email)
+            db.session.add(u)
+            db.session.commit() # Guardamos inmediatamente en Supabase
+            logger.info(f"Nuevo usuario creado: {email}")
+        
+        session["usuario_id"] = u.id
+        session.permanent = True
+        return redirect("/")
+    except Exception as e:
+        logger.error(f"Error en callback: {str(e)}")
+        return "Error en la autenticación", 500
 
 @app.route("/logout")
 def logout():
