@@ -37,7 +37,7 @@ if not secret_key:
     secret_key = "dev_secret_key_provisional"
 app.secret_key = secret_key
 
-# --- CONFIGURACIÓN DE BASE DE DATOS ---
+# --- CONFIGURACIÓN DE BASE DE DATOS (CORREGIDA) ---
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_uri_raw = os.environ.get("DATABASE_URL") or os.environ.get("NEONDB_OWNER")
 
@@ -45,10 +45,11 @@ if not db_uri_raw:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
 else:
     db_uri = db_uri_raw.strip()
+    # Cambiamos a postgresql:// para usar el driver psycopg2-binary
     if db_uri.startswith("postgres://"):
-        db_uri = db_uri.replace("postgres://", "postgresql+pg8000://", 1)
-    elif db_uri.startswith("postgresql://"):
-        db_uri = db_uri.replace("postgresql://", "postgresql+pg8000://", 1)
+        db_uri = db_uri.replace("postgres://", "postgresql://", 1)
+    elif db_uri.startswith("postgresql+pg8000://"):
+        db_uri = db_uri.replace("postgresql+pg8000://", "postgresql://", 1)
     
     if "?" in db_uri:
         db_uri = db_uri.split("?")[0]
@@ -58,7 +59,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
     "pool_recycle": 280,
-    "connect_args": {"ssl": True}
+    "connect_args": {"sslmode": "require"} # Requerido para conexiones seguras externas
 }
 # Aseguramos que la sesión dure y sea válida
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
