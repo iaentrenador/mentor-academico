@@ -37,20 +37,23 @@ if not secret_key:
     secret_key = "dev_secret_key_provisional"
 app.secret_key = secret_key
 
-# --- CONFIGURACIÓN DE BASE DE DATOS (CORREGIDA) ---
+# --- CONFIGURACIÓN DE BASE DE DATOS (ADAPTADA PARA SUPABASE) ---
 basedir = os.path.abspath(os.path.dirname(__file__))
-db_uri_raw = os.environ.get("DATABASE_URL") or os.environ.get("NEONDB_OWNER")
+
+# Priorizamos SUPABASE_DATABASE_URL para evitar conflictos con Render
+db_uri_raw = os.environ.get("SUPABASE_DATABASE_URL") or os.environ.get("DATABASE_URL") or os.environ.get("NEONDB_OWNER")
 
 if not db_uri_raw:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
 else:
     db_uri = db_uri_raw.strip()
-    # Cambiamos a postgresql:// para usar el driver psycopg2-binary
+    # Estandarizamos el protocolo para SQLAlchemy y psycopg2-binary
     if db_uri.startswith("postgres://"):
         db_uri = db_uri.replace("postgres://", "postgresql://", 1)
     elif db_uri.startswith("postgresql+pg8000://"):
         db_uri = db_uri.replace("postgresql+pg8000://", "postgresql://", 1)
     
+    # Eliminamos parámetros que puedan interferir con la configuración manual de SSL
     if "?" in db_uri:
         db_uri = db_uri.split("?")[0]
 
@@ -59,7 +62,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
     "pool_recycle": 280,
-    "connect_args": {"sslmode": "require"} # Requerido para conexiones seguras externas
+    "connect_args": {"sslmode": "require"} # Conexión segura obligatoria para Supabase
 }
 # Aseguramos que la sesión dure y sea válida
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
