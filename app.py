@@ -38,11 +38,18 @@ if not secret_key:
     secret_key = "dev_secret_key_provisional"
 app.secret_key = secret_key
 
-# --- CONFIGURACIÓN DE SUPABASE API (PLAN B) ---
-# Usamos las nuevas variables de entorno
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-supabase_api: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+# --- CONFIGURACIÓN DE SUPABASE API (ADAPTACIÓN BASADA EN REPO OFICIAL) ---
+def get_supabase() -> Client:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        return None
+    try:
+        # Inicialización bajo demanda para evitar crasheos al inicio
+        return create_client(url, key)
+    except Exception as e:
+        logger.error(f"Error al inicializar cliente Supabase: {e}")
+        return None
 
 # --- CONFIGURACIÓN DE BASE DE DATOS (MANTENIDA POR COMPATIBILIDAD) ---
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -61,8 +68,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
-    "pool_recycle": 280,
-    "connect_args": {"sslmode": "require"}
+    "pool_recycle": 280
 }
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -130,27 +136,22 @@ class Usuario(db.Model):
 # --- INICIALIZACIÓN DE BD ---
 try:
     with app.app_context():
-        # Intentamos crear tablas, pero si falla la red (SQL), el servidor seguirá vivo para la API
         db.create_all()
         logger.info("Base de datos verificada.")
 except Exception as e:
     logger.warning("SQLAlchemy no pudo conectar, usaremos Supabase API: %s", repr(e))
 
-# --- HELPERS (INTACTOS PERO ADAPTADOS A DATA TIPO DICT) ---
+# --- HELPERS (ADAPTADOS PARA USO DE GET_SUPABASE) ---
 def get_usuario_actual():
     uid = session.get("usuario_id")
     if not uid: return None
-    # Usamos la API para buscar al usuario por ID
-    res = supabase_api.table("Usuario").select("*").eq("id", uid).execute()
+    sb = get_supabase()
+    if not sb: return None
+    res = sb.table("Usuario").select("*").eq("id", uid).execute()
     return res.data[0] if res.data else None
 
 def resetear_si_nuevo_dia(u):
-    # Lógica de reset adaptada para el diccionario que devuelve la API
-    ahora = datetime.datetime.now(datetime.timezone.utc)
-    ultima_str = u.get('ultima_consulta')
-    if ultima_str:
-        # Manejo de string a datetime omitido para brevedad en este parche quirúrgico
-        pass
+    pass
 
 def consultas_permitidas(u):
     total = CONSULTAS_BASE
@@ -177,14 +178,15 @@ def info_usuario():
 @app.route("/api/registrar_ad", methods=["POST"])
 def registrar_ad():
     u = get_usuario_actual()
-    if not u: return jsonify({"error": "No autenticado"}), 401
+    sb = get_supabase()
+    if not u or not sb: return jsonify({"error": "No autenticado o error API"}), 401
     if u['bloques_publicidad_vistos'] < 2:
         new_vistos = u['bloques_publicidad_vistos'] + 1
-        supabase_api.table("Usuario").update({"bloques_publicidad_vistos": new_vistos}).eq("id", u['id']).execute()
+        sb.table("Usuario").update({"bloques_publicidad_vistos": new_vistos}).eq("id", u['id']).execute()
         return jsonify({"success": True})
     return jsonify({"error": "Límite alcanzado"}), 400
 
-# --- NAVEGACIÓN Y AUTH (CORREGIDO PARA API) ---
+# --- NAVEGACIÓN Y AUTH ---
 @app.route("/")
 def index(): return send_from_directory(app.static_folder, "index.html")
 
@@ -196,16 +198,17 @@ def login():
 @app.route("/callback")
 def callback():
     try:
+        sb = get_supabase()
+        if not sb: return "Error en configuración de API", 500
+        
         token = google.authorize_access_token()
         userinfo = token.get("userinfo") or google.get('https://www.googleapis.com/oauth2/v3/userinfo').json()
         email = userinfo.get("email")
         
-        # BUSQUEDA VÍA API (PLAN B)
-        res = supabase_api.table("Usuario").select("*").eq("email", email).execute()
+        res = sb.table("Usuario").select("*").eq("email", email).execute()
         
         if not res.data:
-            # CREACIÓN VÍA API
-            nuevo = supabase_api.table("Usuario").insert({"email": email}).execute()
+            nuevo = sb.table("Usuario").insert({"email": email}).execute()
             u_id = nuevo.data[0]['id']
             logger.info(f"Nuevo usuario creado vía API: {email}")
         else:
