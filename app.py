@@ -10,8 +10,6 @@ from sqlalchemy import text
 from authlib.integrations.flask_client import OAuth
 # --- CORRECCIÓN: Volvemos a Flask-Mail para evitar conflictos de dependencias en Render ---
 from flask_mail import Mail, Message
-# --- NUEVA LIBRERÍA PARA EL PLAN B ---
-from supabase import create_client, Client
 
 # --- CONFIGURACIÓN E INFRAESTRUCTURA ---
 logging.basicConfig(level=logging.INFO)
@@ -38,22 +36,10 @@ if not secret_key:
     secret_key = "dev_secret_key_provisional"
 app.secret_key = secret_key
 
-# --- CONFIGURACIÓN DE SUPABASE API (ADAPTACIÓN BASADA EN REPO OFICIAL) ---
-def get_supabase() -> Client:
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_KEY")
-    if not url or not key:
-        return None
-    try:
-        # Inicialización bajo demanda para evitar crasheos al inicio
-        return create_client(url, key)
-    except Exception as e:
-        logger.error(f"Error al inicializar cliente Supabase: {e}")
-        return None
-
-# --- CONFIGURACIÓN DE BASE DE DATOS (MANTENIDA POR COMPATIBILIDAD) ---
+# --- CONFIGURACIÓN DE BASE DE DATOS ---
 basedir = os.path.abspath(os.path.dirname(__file__))
-db_uri_raw = os.environ.get("SUPABASE_DATABASE_URL") or os.environ.get("DATABASE_URL") or os.environ.get("NEONDB_OWNER")
+# Eliminada la referencia a SUPABASE_DATABASE_URL
+db_uri_raw = os.environ.get("DATABASE_URL") or os.environ.get("NEONDB_OWNER")
 
 if not db_uri_raw:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
@@ -137,27 +123,24 @@ class Usuario(db.Model):
 try:
     with app.app_context():
         db.create_all()
-        logger.info("Base de datos verificada.")
+        logger.info("Base de datos verificada y tablas creadas.")
 except Exception as e:
-    logger.warning("SQLAlchemy no pudo conectar, usaremos Supabase API: %s", repr(e))
+    logger.error("Error al inicializar la base de datos: %s", repr(e))
 
-# --- HELPERS (ADAPTADOS PARA USO DE GET_SUPABASE) ---
+# --- HELPERS (RESTAURADOS PARA SQLALCHEMY DIRECTO) ---
 def get_usuario_actual():
     uid = session.get("usuario_id")
     if not uid: return None
-    sb = get_supabase()
-    if not sb: return None
-    res = sb.table("Usuario").select("*").eq("id", uid).execute()
-    return res.data[0] if res.data else None
+    return db.session.get(Usuario, uid)
 
 def resetear_si_nuevo_dia(u):
     pass
 
 def consultas_permitidas(u):
     total = CONSULTAS_BASE
-    if u['bloques_publicidad_vistos'] >= 1: total += 3
-    if u['bloques_publicidad_vistos'] >= 2: total += 2
-    return total + u['creditos_comprados']
+    if u.bloques_publicidad_vistos >= 1: total += 3
+    if u.bloques_publicidad_vistos >= 2: total += 2
+    return total + u.creditos_comprados
 
 # --- RUTAS DE API ---
 
@@ -168,21 +151,20 @@ def info_usuario():
         return jsonify({"logueado": False, "restantes": 0, "total_hoy": 0})
     return jsonify({
         "logueado": True,
-        "email": u['email'],
-        "restantes": max(0, consultas_permitidas(u) - u['consultas_usadas']),
+        "email": u.email,
+        "restantes": max(0, consultas_permitidas(u) - u.consultas_usadas),
         "total_hoy": consultas_permitidas(u),
-        "bloques_ad": u['bloques_publicidad_vistos'],
+        "bloques_ad": u.bloques_publicidad_vistos,
         "url_ad": ADSTERRA_URL
     })
 
 @app.route("/api/registrar_ad", methods=["POST"])
 def registrar_ad():
     u = get_usuario_actual()
-    sb = get_supabase()
-    if not u or not sb: return jsonify({"error": "No autenticado o error API"}), 401
-    if u['bloques_publicidad_vistos'] < 2:
-        new_vistos = u['bloques_publicidad_vistos'] + 1
-        sb.table("Usuario").update({"bloques_publicidad_vistos": new_vistos}).eq("id", u['id']).execute()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    if u.bloques_publicidad_vistos < 2:
+        u.bloques_publicidad_vistos += 1
+        db.session.commit()
         return jsonify({"success": True})
     return jsonify({"error": "Límite alcanzado"}), 400
 
@@ -198,23 +180,19 @@ def login():
 @app.route("/callback")
 def callback():
     try:
-        sb = get_supabase()
-        if not sb: return "Error en configuración de API", 500
-        
         token = google.authorize_access_token()
         userinfo = token.get("userinfo") or google.get('https://www.googleapis.com/oauth2/v3/userinfo').json()
         email = userinfo.get("email")
         
-        res = sb.table("Usuario").select("*").eq("email", email).execute()
+        u = Usuario.query.filter_by(email=email).first()
         
-        if not res.data:
-            nuevo = sb.table("Usuario").insert({"email": email}).execute()
-            u_id = nuevo.data[0]['id']
-            logger.info(f"Nuevo usuario creado vía API: {email}")
-        else:
-            u_id = res.data[0]['id']
+        if not u:
+            u = Usuario(email=email)
+            db.session.add(u)
+            db.session.commit()
+            logger.info(f"Nuevo usuario creado en base de datos: {email}")
         
-        session["usuario_id"] = u_id
+        session["usuario_id"] = u.id
         session.permanent = True
         return redirect("/")
     except Exception as e:
