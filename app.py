@@ -8,14 +8,26 @@ from flask import Flask, request, jsonify, session, redirect, url_for, send_from
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from authlib.integrations.flask_client import OAuth
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # --- CONFIGURACIÓN ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='dist', static_url_path='/')
+
+# Solución para MismatchingStateError: Permite que Flask confíe en las cabeceras del proxy de Render
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 CORS(app, supports_credentials=True)
 app.secret_key = os.environ.get("SECRET_KEY", "proyect_upe_secret")
+
+# Configuración de Cookies para Auth estable
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+)
 
 # --- DB ---
 db_uri = os.environ.get("DATABASE_URL")
@@ -55,20 +67,25 @@ def get_user():
 def creditos_restantes(u):
     return (4 + u.bloques_ad_vistos * 2) - u.consultas_usadas
 
-# --- RUTAS QUE FALTABAN O FALLABAN ---
+# --- RUTAS DE API ---
 
 @app.route("/api/usuario")
 def info_usuario():
     u = get_user()
     if not u: return jsonify({"logueado": False, "restantes": 0})
-    return jsonify({"logueado": True, "email": u.email, "restantes": creditos_restantes(u), "total_hoy": 4 + u.bloques_ad_vistos * 2, "url_ad": "https://google.com"})
+    return jsonify({
+        "logueado": True, 
+        "email": u.email, 
+        "restantes": creditos_restantes(u), 
+        "total_hoy": 4 + u.bloques_ad_vistos * 2, 
+        "url_ad": "https://google.com"
+    })
 
 @app.route("/api/explicar_concepto", methods=["POST"])
 def explicar():
     u = get_user()
     if not u or creditos_restantes(u) <= 0: return jsonify({"error": "Sin créditos"}), 403
     data = request.json
-    # IMPORTANTE: El frontend espera 'resultado' como un objeto con 'explicacion', 'puntos_clave', etc.
     sys = "Eres Mentor IA UPE. Responde JSON con campos: 'explicacion', 'puntos_clave' (lista), 'ejemplo_practico'."
     res = llamar_groq(sys, f"Tema: {data.get('pregunta')}. Contexto: {data.get('texto')}")
     u.consultas_usadas += 1
@@ -84,12 +101,12 @@ def red():
     res = llamar_groq(sys, data.get('texto'))
     u.consultas_usadas += 1
     db.session.commit()
-    # El frontend espera 'resultado' conteniendo la red
     return jsonify({"resultado": res, "restantes": creditos_restantes(u)})
 
 @app.route("/api/math/explain", methods=["POST"])
 def math_ex():
     u = get_user()
+    if not u: return jsonify({"error": "No login"}), 401
     data = request.json
     sys = "Profesor de Matemática UPE. JSON con 'explicacion', 'pasos' (lista), 'resultado_final'."
     res = llamar_groq(sys, data.get('exercise'))
@@ -100,6 +117,7 @@ def math_ex():
 @app.route("/api/generar_resumen", methods=["POST"])
 def resumen():
     u = get_user()
+    if not u: return jsonify({"error": "No login"}), 401
     data = request.json
     sys = "Experto en Higiene y Seguridad UPE. Genera un resumen técnico detallado. JSON con campo 'resultado'."
     res = llamar_groq(sys, data.get('content'))
@@ -110,6 +128,7 @@ def resumen():
 @app.route("/api/corregir_escrito", methods=["POST"])
 def corregir():
     u = get_user()
+    if not u: return jsonify({"error": "No login"}), 401
     data = request.json
     sys = "Inspector de Higiene y Seguridad UPE. Corrije el informe. JSON con 'resultado' (objeto con 'texto_corregido', 'observaciones', 'grade')."
     res = llamar_groq(sys, data.get('writing'))
@@ -117,25 +136,25 @@ def corregir():
     db.session.commit()
     return jsonify({"resultado": res.get("resultado", res), "restantes": creditos_restantes(u)})
 
-# --- RUTA DE EXAMEN (La más compleja) ---
 @app.route("/api/exam/generate", methods=["POST"])
 def gen_exam():
     u = get_user()
+    if not u: return jsonify({"error": "No login"}), 401
     data = request.json
     sys = "Genera examen UPE. JSON con campo 'preguntas' que es una lista de objetos {id, tipo, pregunta, opciones, respuesta_correcta}."
     res = llamar_groq(sys, f"Materia: Higiene y Seguridad. Tema: {data.get('material')}")
     u.consultas_usadas += 1
     db.session.commit()
-    # El frontend de examen espera el objeto directo con las preguntas
     return jsonify(res)
 
-# --- RUTAS DE SISTEMA ---
+# --- RUTAS DE SISTEMA / AUTH ---
 @app.route("/login")
-def login(): return redirect("/callback") # Simplificado para test
+def login(): 
+    # Asegura que el callback use la URL externa de Render
+    return redirect(url_for("cb", _external=True))
 
 @app.route("/callback")
 def cb():
-    # Simulación de login para testear rápido si no tienes el client_id configurado
     u = Usuario.query.filter_by(email="test@upe.edu.ar").first()
     if not u:
         u = Usuario(email="test@upe.edu.ar")
@@ -145,7 +164,9 @@ def cb():
     return redirect("/")
 
 @app.route("/")
-def index(): return send_from_directory('dist', 'index.html')
+def index(): 
+    return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
