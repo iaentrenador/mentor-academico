@@ -21,6 +21,10 @@ import MathCorrectionResults from './components/math/MathCorrectionResults';
 import ExamInputView from './components/ExamInputView';
 import ExamTakingView from './components/ExamTakingView';
 import ExamResultsView from './components/ExamResultsView';
+// NUEVOS COMPONENTES
+import ConceptExplainerInputView from './components/ConceptExplainerInputView';
+import ConceptExplainerResultsView from './components/ConceptExplainerResultsView';
+
 import { examService } from './services/examService';
 import { BookOpen, ChevronLeft, ExternalLink, Clock, CheckCircle2, LogIn, LogOut, User } from 'lucide-react';
 
@@ -34,7 +38,6 @@ enum MathAppState {
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | MathAppState | string>(AppState.WELCOME);
   const [loading, setLoading] = useState(false);
-  // CORRECCIÓN: Se añade 'total_hoy' al estado inicial para evitar error TS2339
   const [userStats, setUserStats] = useState({ 
     logueado: false, 
     email: '', 
@@ -148,6 +151,7 @@ const App: React.FC = () => {
     else if (item.type === 'WRITING_CORR') setState(AppState.WRITING_CORRECTION_RESULTS);
     else if (item.type === 'MATH_EXP') setState(MathAppState.MATH_EXPLAINER_RESULTS);
     else if (item.type === 'MATH_CORR') setState(MathAppState.MATH_CORRECTION_RESULTS);
+    else if (item.type === 'EXPLAINER') setState(AppState.CONCEPT_EXPLAINER_RESULTS);
     else if (item.type === 'EXAM') {
       setExamEvaluation(item.data);
       setState(AppState.EXAM_RESULTS);
@@ -169,6 +173,7 @@ const App: React.FC = () => {
 
     if (activityId === 'SUMMARY') setState(AppState.SUMMARY_SELECTION);
     else if (activityId === 'NETWORK') { setNetworkResult(null); setState(AppState.TEXT_DISPLAY); }
+    else if (activityId === 'EXPLAINER') setState(AppState.CONCEPT_EXPLAINER_INPUT);
     else if (activityId === 'CORRECTION') {
       setWritingInput(prev => ({ ...prev, activityType: 'CORRECTION', activityTitle: activityTitles[activityId] }));
       setState(AppState.WRITING_CORRECTION_INPUT);
@@ -179,6 +184,31 @@ const App: React.FC = () => {
       setWritingInput(prev => ({ ...prev, activityType: activityId, activityTitle: activityTitles[activityId] }));
       setState(AppState.WRITING_CORRECTION_INPUT);
     }
+  };
+
+  const handleExplainConcept = async (text: string, question: string, isLawyerMode: boolean) => {
+    if (!checkCredits()) return;
+    setLoading(true);
+    try {
+      const response = await fetch('/api/explicar_concepto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          texto: text, 
+          pregunta: question, 
+          modo_legal: isLawyerMode,
+          materia: writingInput.materia 
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setResultado(data.resultado);
+        setUserStats(prev => ({ ...prev, restantes: data.restantes }));
+        saveToHistory('EXPLAINER', `Explicación: ${question.substring(0, 30)}...`, data.resultado);
+        setState(AppState.CONCEPT_EXPLAINER_RESULTS);
+      } else alert(data.error);
+    } catch (e) { alert("Error de conexión"); }
+    finally { setLoading(false); }
   };
 
   const handleStartExam = async (material: string, count: number, types: ExamQuestionType[]) => {
@@ -498,6 +528,22 @@ const App: React.FC = () => {
 
         {state === MathAppState.MATH_CORRECTION_RESULTS && resultado && (
           <MathCorrectionResults result={resultado} onRestart={() => setState(AppState.ACTIVITY_SELECTION)} onRetry={() => setState(MathAppState.MATH_CORRECTION_INPUT)} />
+        )}
+
+        {/* RUTAS DEL EXPLICADOR DE CONCEPTOS */}
+        {state === AppState.CONCEPT_EXPLAINER_INPUT && (
+          <ConceptExplainerInputView 
+            onBack={() => setState(AppState.ACTIVITY_SELECTION)} 
+            onSubmit={handleExplainConcept} 
+          />
+        )}
+
+        {state === AppState.CONCEPT_EXPLAINER_RESULTS && resultado && (
+          <ConceptExplainerResultsView 
+            result={resultado} 
+            onRestart={() => setState(AppState.WELCOME)} 
+            onNewQuestion={() => setState(AppState.CONCEPT_EXPLAINER_INPUT)} 
+          />
         )}
 
         {state === AppState.WRITING_CORRECTION_INPUT && writingInput.activityType === 'CORRECTION' && (
