@@ -9,24 +9,20 @@ export enum AppState {
   WRITING_CORRECTION_RESULTS = 'WRITING_CORRECTION_RESULTS', 
   ACTIVITY_SELECTION = 'ACTIVITY_SELECTION', 
   TEXT_DISPLAY = 'TEXT_DISPLAY',
-  CONCEPTUAL_NETWORK_RESULTS = 'CONCEPTUAL_NETWORK_RESULTS', // <--- ESTADO AGREGADO
-  // Estados para el Módulo de Resúmenes
+  CONCEPTUAL_NETWORK_RESULTS = 'CONCEPTUAL_NETWORK_RESULTS', 
   SUMMARY_SELECTION = 'SUMMARY_SELECTION',
   SUMMARY_GENERATION_INPUT = 'SUMMARY_GENERATION_INPUT',
   SUMMARY_CORRECTION_INPUT = 'SUMMARY_CORRECTION_INPUT',
   SUMMARY_GENERATION_RESULTS = 'SUMMARY_GENERATION_RESULTS',
   SUMMARY_CORRECTION_RESULTS = 'SUMMARY_CORRECTION_RESULTS',
-  // --- NUEVOS ESTADOS MÓDULO MATEMÁTICAS ---
   MATH_SELECTION = 'MATH_SELECTION',
   MATH_EXPLAINER_INPUT = 'MATH_EXPLAINER_INPUT',
   MATH_EXPLAINER_RESULTS = 'MATH_EXPLAINER_RESULTS',
   MATH_CORRECTION_INPUT = 'MATH_CORRECTION_INPUT',
   MATH_CORRECTION_RESULTS = 'MATH_CORRECTION_RESULTS',
-  // --- NUEVOS ESTADOS SIMULACRO DE EXAMEN ---
   EXAM_INPUT = 'EXAM_INPUT',
   EXAM_TAKING = 'EXAM_TAKING',
   EXAM_RESULTS = 'EXAM_RESULTS',
-  // --- ESTADOS EXPLICADOR DE CONCEPTOS ---
   CONCEPT_EXPLAINER_INPUT = 'CONCEPT_EXPLAINER_INPUT',
   CONCEPT_EXPLAINER_RESULTS = 'CONCEPT_EXPLAINER_RESULTS'
 }
@@ -104,7 +100,6 @@ export interface WritingCorrectionResult {
   };
 }
 
-// 6.1 Interfaz para el resultado de Generación Automática de Resúmenes
 export interface SummaryGenerationResult {
   title: string;
   executiveSummary: string;
@@ -112,7 +107,6 @@ export interface SummaryGenerationResult {
   conclusions: string;
 }
 
-// 6.2 Interfaz para el resultado de Corrección de Resúmenes
 export interface SummaryCorrectionResult {
   grade: number;
   status: 'Excelente' | 'Satisfactorio' | 'Insúficiente';
@@ -125,7 +119,6 @@ export interface SummaryCorrectionResult {
   improvedVersion: string;
 }
 
-// 6.3 Interfaz para el resultado de Red Conceptual
 export interface ConceptualNode {
   id: string;
   label: string;
@@ -142,7 +135,7 @@ export interface ConceptualNetworkResult {
   title: string;
   summary: string;
   nodes: ConceptualNode[];
-  edges: ConceptualEdge[];
+  edges: ConceptualEdge[]; // Sincronizado con 'edges' (antes 'enlaces' en backend)
 }
 
 // --- 6.4 INTERFACES MÓDULO MATEMÁTICAS ---
@@ -153,15 +146,18 @@ export interface MathExplainerInput {
 }
 
 export interface MathExplainerResult {
-  theoreticalContext: string;
-  similarExample: {
+  explicacion: string; // Sincronizado con backend
+  pasos: string[];    // Sincronizado con backend
+  resultado_final: string; // Sincronizado con backend
+  theoreticalContext?: string;
+  similarExample?: {
     problem: string;
     solutionSteps: string[];
     finalResult: string;
     explanation: string;
   };
-  keyFormulas: string[];
-  tips: string[];
+  keyFormulas?: string[];
+  tips?: string[];
 }
 
 export interface MathCorrectionInput {
@@ -188,7 +184,8 @@ export interface MathCorrectionResult {
 
 // --- 6.5 INTERFACES SIMULACRO DE EXAMEN ---
 
-export type ExamQuestionType = 'multiple-choice' | 'development' | 'justification';
+// Sincronizado con nombres en español para evitar errores de conexión/mapeo
+export type ExamQuestionType = 'Opción Múltiple' | 'Desarrollo' | 'Justificación';
 
 export interface ExamQuestion {
   id: string;
@@ -216,8 +213,12 @@ export interface ExamEvaluation {
   }[];
 }
 
-// 7. Estado General
+// 7. Estado General (Sincronizado con App.tsx)
 export interface UserStats {
   logueado: boolean;
+  email: string;
   restantes: number;
+  url_ad: string;
+  bloques_ad: number;
+  total_hoy: number;
 }
