@@ -13,20 +13,23 @@ export const examService = {
     const response = await fetch('/api/exam/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // Asegura el envío de cookies de sesión
       body: JSON.stringify({ material, count, types, profile })
     });
 
     if (!response.ok) {
-      // Si el servidor responde 403, lanzamos un error específico que App.tsx sepa leer
       if (response.status === 403) {
         throw new Error('CREDITS_EXHAUSTED');
       }
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || 'Error al generar el examen');
     }
 
     const data = await response.json();
-    return data.resultado;
+    
+    // Sincronización: El backend devuelve directamente el objeto con { preguntas: [...] }
+    // Si no existe 'questions' o 'preguntas', devolvemos el objeto completo para evitar undefined.
+    return data.questions ? data : { questions: data.preguntas || [] };
   },
 
   /**
@@ -36,22 +39,24 @@ export const examService = {
     answers: Record<string, string>, 
     material: string
   ): Promise<ExamEvaluation> => {
-    const response = await fetch('/api/exam/evaluate', {
+    const response = await fetch('/api/corregir_escrito', { // Usamos la ruta disponible en app.py para evaluación
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers, material })
+      credentials: 'include', // Asegura el envío de cookies de sesión
+      body: JSON.stringify({ writing: JSON.stringify(answers), sourceText: material, activityType: 'EXAM' })
     });
 
     if (!response.ok) {
-      // También validamos créditos aquí por seguridad
       if (response.status === 403) {
         throw new Error('CREDITS_EXHAUSTED');
       }
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || 'Error al evaluar el examen');
     }
 
     const data = await response.json();
-    return data.resultado;
+    
+    // Sincronización: Si el backend envuelve el resultado en 'resultado', lo extraemos.
+    return data.resultado || data;
   }
 };
