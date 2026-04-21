@@ -1,4 +1,3 @@
-
 import os
 import logging
 import datetime
@@ -148,7 +147,7 @@ def obtener_campo(data: dict, campo: str, tipo=str, default=None, requerido=Fals
             return None, f"El campo '{campo}' debe ser de tipo {tipo.__name__}."
     return valor, None
 
-# --- RUTAS: MATEMÁTICAS ---
+# --- RUTAS PRINCIPALES ---
 
 @app.route("/api/math_logic", methods=["POST"])
 def math_logic():
@@ -177,8 +176,6 @@ def math_logic():
     if not descontar_consulta(u):
         return jsonify({"error": "No se pudo registrar la consulta."}), 500
     return jsonify(resultado)
-
-# --- RUTAS: SIMULACRO DE EXAMEN ---
 
 @app.route("/api/generar_examen", methods=["POST"])
 def generar_examen():
@@ -214,8 +211,6 @@ def generar_examen():
         return jsonify({"error": "No se pudo registrar la consulta."}), 500
     return jsonify(resp_json)
 
-# --- RUTAS: RED Y ESCRITO ---
-
 @app.route("/api/generar_red", methods=["POST"])
 def generar_red():
     u = get_usuario_actual()
@@ -248,7 +243,13 @@ def corregir_escrito():
     descontar_consulta(u)
     return jsonify(resultado)
 
-# --- RUTAS EXISTENTES Y ALIASES ---
+# --- CAPA DE COMPATIBILIDAD (ALIASES) ---
+app.add_url_rule("/api/explicar_concepto", view_func=math_logic, methods=["POST"])
+app.add_url_rule("/api/generar_resumen",   view_func=corregir_escrito, methods=["POST"])
+app.add_url_rule("/api/corregir_informe",  view_func=corregir_escrito, methods=["POST"])
+app.add_url_rule("/api/math/logic",        view_func=math_logic, methods=["POST"])
+app.add_url_rule("/api/exam/generate",     view_func=generar_examen, methods=["POST"])
+app.add_url_rule("/api/text/correct",      view_func=corregir_escrito, methods=["POST"])
 
 @app.route("/api/usuario")
 def info_usuario():
@@ -261,10 +262,6 @@ def info_usuario():
         "perfil": json.loads(u.perfil_aprendizaje)
     })
 
-app.add_url_rule("/api/exam/generate",  view_func=generar_examen,   methods=["POST"])
-app.add_url_rule("/api/text/correct",   view_func=corregir_escrito, methods=["POST"])
-app.add_url_rule("/api/math/logic",     view_func=math_logic,       methods=["POST"])
-
 @app.route("/login")
 def login():
     return google.authorize_redirect(url_for("callback", _external=True))
@@ -272,19 +269,16 @@ def login():
 @app.route("/callback")
 def callback():
     try:
-        # Implementación reparada y robusta de la autenticación
         token = google.authorize_access_token()
         userinfo = token.get("userinfo")
         if not userinfo or not userinfo.get("email"):
             return "Error al obtener datos de Google", 400
-            
         email = userinfo['email']
         u = Usuario.query.filter_by(email=email).first()
         if not u:
             u = Usuario(email=email)
             db.session.add(u)
             db.session.commit()
-            
         session["usuario_id"] = u.id
         session.permanent = True
         return redirect("/")
