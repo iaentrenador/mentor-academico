@@ -14,16 +14,25 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    // En desarrollo local, redirige todas las llamadas /api/ al backend Flask
+    // En desarrollo local, redirige todas las llamadas al backend Flask (Puerto 5000)
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:10000',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
         secure: false,
       },
-      '/login': 'http://127.0.0.1:10000',
-      '/callback': 'http://127.0.0.1:10000',
-      '/logout': 'http://127.0.0.1:10000',
+      '/login': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+      },
+      '/callback': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+      },
+      '/logout': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+      },
     },
   },
 });
