@@ -220,6 +220,56 @@ def explicar_concepto():
         logger.error(f"Error en explainer: {str(e)}")
         return jsonify({"error": "Error al procesar la solicitud"}), 500
 
+@app.route("/api/generar_resumen", methods=["POST"])
+def generar_resumen():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    if u.consultas_usadas >= consultas_permitidas(u):
+        return jsonify({"error": "Créditos agotados"}), 403
+
+    data = request.json
+    texto = data.get("texto", "")
+    materia = data.get("materia", "higiene_upe")
+
+    perfil = PERFILES_MATERIA.get(materia, PERFILES_MATERIA["higiene_upe"])
+
+    prompt = f"""
+    {ACADEMIC_COACH_PERSONA}
+    {perfil}
+    
+    CONSIGNA: Crea un resumen universitario profesional del siguiente texto técnico.
+    TEXTO: {texto}
+    
+    RESPONDE ESTRICTAMENTE EN FORMATO JSON:
+    {{
+      "title": "Título sugerido del resumen",
+      "executiveSummary": "Párrafo de síntesis principal",
+      "keyConcepts": [
+        {{ "concept": "Nombre del concepto", "definition": "Definición técnica" }}
+      ],
+      "conclusions": "Síntesis final de importancia para la materia"
+    }}
+    """
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=MODEL_ID,
+            response_format={"type": "json_object"}
+        )
+        resultado = json.loads(chat_completion.choices[0].message.content)
+        
+        u.consultas_usadas += 1
+        db.session.commit()
+        
+        return jsonify({
+            "resultado": resultado,
+            "restantes": consultas_permitidas(u) - u.consultas_usadas
+        })
+    except Exception as e:
+        logger.error(f"Error en resumen: {str(e)}")
+        return jsonify({"error": "Error al procesar el resumen"}), 500
+
 # --- NAVEGACIÓN Y AUTH ---
 @app.route("/")
 def index(): return send_from_directory(app.static_folder, "index.html")
