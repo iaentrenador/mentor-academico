@@ -15,6 +15,9 @@ from flask_mail import Mail, Message
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Railway asigna un puerto dinámico mediante la variable de entorno PORT
+port = int(os.environ.get("PORT", 5000))
+
 dist_path = os.path.join(os.path.dirname(__file__), 'dist')
 if not os.path.exists(dist_path):
     os.makedirs(dist_path, exist_ok=True)
@@ -36,25 +39,26 @@ if not secret_key:
     secret_key = "dev_secret_key_provisional"
 app.secret_key = secret_key
 
-# --- CONFIGURACIÓN DE BASE DE DATOS ---
-basedir = os.path.abspath(os.path.dirname(__file__))
-db_uri_raw = os.environ.get("DATABASE_URL") or os.environ.get("NEONDB_OWNER")
+# --- CONFIGURACIÓN DE BASE DE DATOS (AJUSTADA PARA RAILWAY) ---
+db_uri_raw = os.environ.get("DATABASE_URL")
 
-if not db_uri_raw:
-    db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
+if db_uri_raw:
+    # Ajuste de protocolo: Railway usa postgres://, SQLAlchemy requiere postgresql://
+    db_uri = db_uri_raw.replace("postgres://", "postgresql://", 1).split("?")[0]
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "connect_args": {"sslmode": "require"} # Indispensable para la seguridad de Railway
+    }
+    logger.info("SISTEMA: Configuración de PostgreSQL (Railway) detectada.")
 else:
-    db_uri = db_uri_raw.strip()
-    if db_uri.startswith("postgres://"):
-        db_uri = db_uri.replace("postgres://", "postgresql://", 1)
-    if "?" in db_uri:
-        db_uri = db_uri.split("?")[0]
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+    logger.warning("SISTEMA: DATABASE_URL no encontrada. Usando SQLite local.")
 
-app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True,
-    "pool_recycle": 280
-}
 app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = True
@@ -118,13 +122,18 @@ class Usuario(db.Model):
     material = db.Column(db.Text, default="")
     perfil_aprendizaje = db.Column(db.Text, default="{}")
 
-# --- INICIALIZACIÓN DE BD ---
+# --- INICIALIZACIÓN DE BD CON FALLBACK ---
 try:
     with app.app_context():
         db.create_all()
-        logger.info("Base de datos verificada y tablas creadas.")
+        logger.info("Base de datos: Sincronización exitosa.")
 except Exception as e:
-    logger.error("Error al inicializar la base de datos: %s", repr(e))
+    logger.error(f"Error crítico en DB: {e}")
+    # Si Postgres falla, intentamos levantar con SQLite para evitar que el deploy muera
+    with app.app_context():
+        app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///emergency.db'
+        db.create_all()
+    logger.warning("SISTEMA: La aplicación arrancó con base de datos de emergencia.")
 
 # --- HELPERS ---
 def get_usuario_actual():
@@ -307,4 +316,5 @@ def logout():
     return redirect("/")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    # Importante: Railway requiere host 0.0.0.0 y el puerto dinámico de la variable PORT
+    app.run(host="0.0.0.0", port=port)
