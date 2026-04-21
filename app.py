@@ -1,3 +1,4 @@
+
 import os
 import logging
 import datetime
@@ -89,6 +90,7 @@ class Usuario(db.Model):
     bloques_publicidad_vistos = db.Column(db.Integer, default=0, nullable=False)
     creditos_comprados = db.Column(db.Integer, default=0, nullable=False)
     material = db.Column(db.Text, default="")
+    perfil_aprendizaje = db.Column(db.Text, default="{}")
 
 # --- INICIALIZACIÓN DE BD ---
 try:
@@ -107,19 +109,20 @@ def consultas_permitidas(u):
 
 def llamar_groq(prompt: str) -> dict:
     try:
-        prompt_estricto = prompt + "\n\nIMPORTANTE: Responde ÚNICAMENTE con el objeto JSON solicitado. No incluyas explicaciones fuera del JSON."
         chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt_estricto}],
+            messages=[
+                {"role": "system", "content": "Eres el Mentor Académico UPE. Responde solo en JSON técnico."},
+                {"role": "user", "content": prompt}
+            ],
             model=MODEL_ID,
             response_format={"type": "json_object"},
-            timeout=40
+            timeout=45
         )
         raw = chat_completion.choices[0].message.content
-        logger.info(f"RESPUESTA IA RECIBIDA: {raw}") 
         return json.loads(raw)
     except json.JSONDecodeError as e:
         logger.error(f"Groq devolvió JSON inválido: {e}")
-        raise ValueError("La IA devolvió un formato incorrecto. Reintenta la operación.")
+        raise ValueError("La IA devolvió una respuesta con formato inválido. Intentá de nuevo.")
     except Exception as e:
         logger.error(f"Error en llamada a Groq: {e}")
         raise RuntimeError(f"Error al contactar el servicio de IA: {str(e)}")
@@ -131,143 +134,136 @@ def descontar_consulta(u: Usuario) -> bool:
         return True
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error al guardar consulta: {e}")
+        logger.error(f"Error al guardar consulta para usuario {u.id}: {e}")
         return False
 
 def obtener_campo(data: dict, campo: str, tipo=str, default=None, requerido=False):
     valor = data.get(campo, default)
-    if requerido and (valor is None or valor == ""):
+    if requerido and valor is None:
         return None, f"El campo '{campo}' es requerido."
     if valor is not None:
         try:
             valor = tipo(valor)
         except (ValueError, TypeError):
-            return None, f"El campo '{campo}' debe ser {tipo.__name__}."
+            return None, f"El campo '{campo}' debe ser de tipo {tipo.__name__}."
     return valor, None
 
-# --- RUTAS: MATEMÁTICAS (Sincronizada) ---
+# --- RUTAS: MATEMÁTICAS ---
 
-@app.route("/api/math/logic", methods=["POST"])
+@app.route("/api/math_logic", methods=["POST"])
 def math_logic():
     u = get_usuario_actual()
     if not u or u.consultas_usadas >= consultas_permitidas(u):
         return jsonify({"error": "No autorizado o sin créditos"}), 403
-
     data = request.json or {}
     tipo, err = obtener_campo(data, "tipo", requerido=True)
-    tema, err2 = obtener_campo(data, "tema", requerido=True)
-    ejercicio, err3 = obtener_campo(data, "ejercicio", requerido=True)
-    if err or err2 or err3:
-        return jsonify({"error": err or err2 or err3}), 400
-
+    if err: return jsonify({"error": err}), 400
+    tema, err = obtener_campo(data, "tema", requerido=True)
+    if err: return jsonify({"error": err}), 400
+    ejercicio, err = obtener_campo(data, "ejercicio", requerido=True)
+    if err: return jsonify({"error": err}), 400
     resolucion_alumno = data.get("resolucion", "")
     prompt = f"""
     {PERFILES_MATERIA['matematica_propedutico']}
     TAREA: {tipo.upper()} el siguiente ejercicio de {tema}: {ejercicio}.
     {f"Resolución del alumno a corregir: {resolucion_alumno}" if tipo == 'corregir' else "Explica el paso a paso."}
-    Usa LaTeX. JSON: 'explicacion', 'pasos', 'resultado', 'feedback_entrenador'.
+    Usa un tono intermedio, motivador pero estricto con los signos y reglas. Usa LaTeX.
+    Responde en JSON con: 'explicacion', 'pasos' (lista), 'resultado' y 'feedback_entrenador'.
     """
-
     try:
         resultado = llamar_groq(prompt)
-    except Exception as e:
+    except (ValueError, RuntimeError) as e:
         return jsonify({"error": str(e)}), 502
-
     if not descontar_consulta(u):
-        return jsonify({"error": "Error de base de datos"}), 500
+        return jsonify({"error": "No se pudo registrar la consulta."}), 500
     return jsonify(resultado)
 
-# --- RUTAS: SIMULACRO DE EXAMEN (Sincronizada con error 405) ---
+# --- RUTAS: SIMULACRO DE EXAMEN ---
 
-@app.route("/api/exam/generate", methods=["POST"])
+@app.route("/api/generar_examen", methods=["POST"])
 def generar_examen():
     u = get_usuario_actual()
     if not u or u.consultas_usadas >= consultas_permitidas(u):
         return jsonify({"error": "Sin créditos"}), 403
-
     data = request.json or {}
-    cantidad_raw, _ = obtener_campo(data, "cantidad", tipo=int, default=5)
+    cantidad_raw, err = obtener_campo(data, "cantidad", tipo=int, default=5)
+    if err: return jsonify({"error": err}), 400
     cantidad = min(cantidad_raw, 20)
-    contenido = data.get("contenido") or data.get("texto", "")
+    contenido = data.get("contenido", "")
     tipos = data.get("tipos", ["Opción Múltiple"])
-
-    if not isinstance(tipos, list) or not tipos:
-        return jsonify({"error": "Lista de tipos inválida"}), 400
-
+    if not isinstance(tipos, list) or len(tipos) == 0:
+        return jsonify({"error": "Lista de tipos inválida."}), 400
     cant_base = cantidad // len(tipos)
     resto = cantidad % len(tipos)
     distribucion = {t: cant_base + (1 if i < resto else 0) for i, t in enumerate(tipos)}
-
     prompt = f"""
     {PERFILES_MATERIA['higiene_upe']}
-    Genera {cantidad} preguntas de: {contenido}.
-    Distribución: {distribucion}.
-    REGLA: En Choice, 'respuesta_correcta' es el TEXTO de la opción.
+    Genera EXACTAMENTE {cantidad} preguntas basadas en: {contenido}.
+    Distribución exacta por tipo: {distribucion}.
+    REGLA: 'respuesta_correcta' debe ser el TEXTO EXACTO de la opción.
     JSON: 'preguntas' [id, tipo, pregunta, opciones, respuesta_correcta, justificacion_tecnica].
     """
-
     try:
         resp_json = llamar_groq(prompt)
-    except Exception as e:
+    except (ValueError, RuntimeError) as e:
         return jsonify({"error": str(e)}), 502
-
     for p in resp_json.get("preguntas", []):
         if p.get("tipo") == "Opción Múltiple" and isinstance(p.get("opciones"), list):
             random.shuffle(p["opciones"])
-
     if not descontar_consulta(u):
-        return jsonify({"error": "Error de base de datos"}), 500
+        return jsonify({"error": "No se pudo registrar la consulta."}), 500
     return jsonify(resp_json)
 
-# --- RUTAS: RED Y ESCRITO (Sincronizadas) ---
+# --- RUTAS: RED Y ESCRITO ---
 
-@app.route("/api/concept/map", methods=["POST"])
+@app.route("/api/generar_red", methods=["POST"])
 def generar_red():
     u = get_usuario_actual()
     if not u or u.consultas_usadas >= consultas_permitidas(u):
         return jsonify({"error": "No autorizado o sin créditos"}), 403
-
     data = request.json or {}
     texto, err = obtener_campo(data, "texto", requerido=True)
     if err: return jsonify({"error": err}), 400
-
-    prompt = f"Genera una red conceptual: {texto}. JSON: 'nodos' (id, label), 'enlaces' (source, target, label)."
-
+    prompt = f"Genera una red conceptual: {texto}. JSON con 'nodos' y 'enlaces'."
     try:
         resultado = llamar_groq(prompt)
-    except Exception as e:
+    except (ValueError, RuntimeError) as e:
         return jsonify({"error": str(e)}), 502
-
     descontar_consulta(u)
     return jsonify(resultado)
 
-@app.route("/api/text/correct", methods=["POST"])
+@app.route("/api/corregir_escrito", methods=["POST"])
 def corregir_escrito():
     u = get_usuario_actual()
     if not u or u.consultas_usadas >= consultas_permitidas(u):
         return jsonify({"error": "No autorizado o sin créditos"}), 403
-
     data = request.json or {}
     texto, err = obtener_campo(data, "texto", requerido=True)
     if err: return jsonify({"error": err}), 400
-
-    prompt = f"{PERFILES_MATERIA['higiene_upe']} Evalúa este informe: {texto}. JSON: 'texto_corregido', 'observaciones_legales', 'nota'."
-
+    prompt = f"{PERFILES_MATERIA['higiene_upe']} Evalúa: {texto}. JSON: 'texto_corregido', 'observaciones_legales', 'nota', 'performanceAnalysis', 'feedback_entrenador'."
     try:
         resultado = llamar_groq(prompt)
-    except Exception as e:
+    except (ValueError, RuntimeError) as e:
         return jsonify({"error": str(e)}), 502
-
     descontar_consulta(u)
     return jsonify(resultado)
 
-# --- RUTAS EXISTENTES ---
+# --- RUTAS EXISTENTES Y ALIASES ---
 
 @app.route("/api/usuario")
 def info_usuario():
     u = get_usuario_actual()
     if not u: return jsonify({"logueado": False})
-    return jsonify({"logueado": True, "email": u.email, "restantes": consultas_permitidas(u) - u.consultas_usadas})
+    return jsonify({
+        "logueado": True,
+        "email": u.email,
+        "restantes": consultas_permitidas(u) - u.consultas_usadas,
+        "perfil": json.loads(u.perfil_aprendizaje)
+    })
+
+app.add_url_rule("/api/exam/generate",  view_func=generar_examen,   methods=["POST"])
+app.add_url_rule("/api/text/correct",   view_func=corregir_escrito, methods=["POST"])
+app.add_url_rule("/api/math/logic",     view_func=math_logic,       methods=["POST"])
 
 @app.route("/login")
 def login():
@@ -275,15 +271,26 @@ def login():
 
 @app.route("/callback")
 def callback():
-    token = google.authorize_access_token()
-    userinfo = token.get("userinfo")
-    u = Usuario.query.filter_by(email=userinfo['email']).first()
-    if not u:
-        u = Usuario(email=userinfo['email'])
-        db.session.add(u)
-        db.session.commit()
-    session["usuario_id"] = u.id
-    return redirect("/")
+    try:
+        # Implementación reparada y robusta de la autenticación
+        token = google.authorize_access_token()
+        userinfo = token.get("userinfo")
+        if not userinfo or not userinfo.get("email"):
+            return "Error al obtener datos de Google", 400
+            
+        email = userinfo['email']
+        u = Usuario.query.filter_by(email=email).first()
+        if not u:
+            u = Usuario(email=email)
+            db.session.add(u)
+            db.session.commit()
+            
+        session["usuario_id"] = u.id
+        session.permanent = True
+        return redirect("/")
+    except Exception as e:
+        logger.error(f"Error en Google Auth: {e}")
+        return f"Error en la autenticación: {str(e)}", 500
 
 @app.route("/logout")
 def logout():
