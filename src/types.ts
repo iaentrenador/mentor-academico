@@ -1,4 +1,4 @@
-// src/types.ts
+ // src/types.ts
 
 // 1. Estados de la Aplicación
 export enum AppState {
@@ -25,7 +25,10 @@ export enum AppState {
   // --- NUEVOS ESTADOS SIMULACRO DE EXAMEN ---
   EXAM_INPUT = 'EXAM_INPUT',
   EXAM_TAKING = 'EXAM_TAKING',
-  EXAM_RESULTS = 'EXAM_RESULTS'
+  EXAM_RESULTS = 'EXAM_RESULTS',
+  // --- ESTADOS EXPLICADOR DE CONCEPTOS ---
+  CONCEPT_EXPLAINER_INPUT = 'CONCEPT_EXPLAINER_INPUT',
+  CONCEPT_EXPLAINER_RESULTS = 'CONCEPT_EXPLAINER_RESULTS'
 }
 
 // 2. Definición del Historial
