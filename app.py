@@ -38,7 +38,6 @@ app.secret_key = secret_key
 
 # --- CONFIGURACIÓN DE BASE DE DATOS ---
 basedir = os.path.abspath(os.path.dirname(__file__))
-# Eliminada la referencia a SUPABASE_DATABASE_URL
 db_uri_raw = os.environ.get("DATABASE_URL") or os.environ.get("NEONDB_OWNER")
 
 if not db_uri_raw:
@@ -88,7 +87,7 @@ if not api_key:
 client = Groq(api_key=api_key)
 MODEL_ID = "llama-3.3-70b-versatile"
 
-# --- CONSTANTES Y PERFILES (INTACTOS) ---
+# --- CONSTANTES Y PERFILES ---
 TAREAS_VALIDAS = {
     "explicar", "resumir", "evaluar", "cargar_material",
     "preparar_oratoria", "generar_examen", "generar_rap", "generar_red",
@@ -108,7 +107,7 @@ PERFILES_MATERIA = {
     "abogacia_unlz": "ROL: Profesor de la Facultad de Derecho UNLZ.",
 }
 
-# --- MODELO (INTACTO) ---
+# --- MODELO ---
 class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(200), unique=True, nullable=False)
@@ -127,14 +126,11 @@ try:
 except Exception as e:
     logger.error("Error al inicializar la base de datos: %s", repr(e))
 
-# --- HELPERS (RESTAURADOS PARA SQLALCHEMY DIRECTO) ---
+# --- HELPERS ---
 def get_usuario_actual():
     uid = session.get("usuario_id")
     if not uid: return None
     return db.session.get(Usuario, uid)
-
-def resetear_si_nuevo_dia(u):
-    pass
 
 def consultas_permitidas(u):
     total = CONSULTAS_BASE
@@ -167,6 +163,62 @@ def registrar_ad():
         db.session.commit()
         return jsonify({"success": True})
     return jsonify({"error": "Límite alcanzado"}), 400
+
+@app.route("/api/explicar_concepto", methods=["POST"])
+def explicar_concepto():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No autenticado"}), 401
+    if u.consultas_usadas >= consultas_permitidas(u):
+        return jsonify({"error": "Créditos agotados"}), 403
+
+    data = request.json
+    texto = data.get("texto", "")
+    pregunta = data.get("pregunta", "")
+    modo_legal = data.get("modo_legal", False)
+    materia = data.get("materia", "higiene_upe")
+
+    perfil = PERFILES_MATERIA.get(materia, PERFILES_MATERIA["higiene_upe"])
+    instrucciones_legales = "Utiliza terminología técnica y cita leyes si es pertinente." if modo_legal else "Usa un lenguaje claro y pedagógico."
+
+    prompt = f"""
+    {ACADEMIC_COACH_PERSONA}
+    {perfil}
+    
+    CONSIGNA: El estudiante quiere comprender un concepto basado en el siguiente texto.
+    TEXTO: {texto}
+    DUDA DEL ESTUDIANTE: {pregunta}
+    
+    {instrucciones_legales}
+    
+    IMPORTANTE: Si el estudiante envió una consigna de examen, NO la resuelvas directamente. Explica la teoría detrás para que él pueda resolverla.
+    
+    RESPONDE ESTRICTAMENTE EN FORMATO JSON con la siguiente estructura:
+    {{
+      "explanation": "Texto de la explicación detallada",
+      "examples": ["Ejemplo 1", "Ejemplo 2"],
+      "keyTakeaways": ["Punto clave 1", "Punto clave 2"],
+      "relatedConcepts": ["Concepto A", "Concepto B"]
+    }}
+    """
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=MODEL_ID,
+            response_format={"type": "json_object"}
+        )
+        resultado = json.loads(chat_completion.choices[0].message.content)
+        
+        u.consultas_usadas += 1
+        db.session.commit()
+        
+        return jsonify({
+            "resultado": resultado,
+            "restantes": consultas_permitidas(u) - u.consultas_usadas
+        })
+    except Exception as e:
+        logger.error(f"Error en explainer: {str(e)}")
+        return jsonify({"error": "Error al procesar la solicitud"}), 500
 
 # --- NAVEGACIÓN Y AUTH ---
 @app.route("/")
