@@ -106,18 +106,13 @@ def consultas_permitidas(u):
     return 4 + (u.bloques_publicidad_vistos * 2) + u.creditos_comprados
 
 def llamar_groq(prompt: str) -> dict:
-    """
-    Versión blindada: Fuerza JSON, aumenta timeout y loguea la respuesta cruda.
-    """
     try:
-        # Refuerzo de instrucción para evitar texto basura de la IA
         prompt_estricto = prompt + "\n\nIMPORTANTE: Responde ÚNICAMENTE con el objeto JSON solicitado. No incluyas explicaciones fuera del JSON."
-        
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt_estricto}],
             model=MODEL_ID,
             response_format={"type": "json_object"},
-            timeout=40  # Timeout extendido para procesos pesados
+            timeout=40
         )
         raw = chat_completion.choices[0].message.content
         logger.info(f"RESPUESTA IA RECIBIDA: {raw}") 
@@ -150,9 +145,9 @@ def obtener_campo(data: dict, campo: str, tipo=str, default=None, requerido=Fals
             return None, f"El campo '{campo}' debe ser {tipo.__name__}."
     return valor, None
 
-# --- RUTAS: MATEMÁTICAS ---
+# --- RUTAS: MATEMÁTICAS (Sincronizada) ---
 
-@app.route("/api/math_logic", methods=["POST"])
+@app.route("/api/math/logic", methods=["POST"])
 def math_logic():
     u = get_usuario_actual()
     if not u or u.consultas_usadas >= consultas_permitidas(u):
@@ -182,9 +177,9 @@ def math_logic():
         return jsonify({"error": "Error de base de datos"}), 500
     return jsonify(resultado)
 
-# --- RUTAS: SIMULACRO DE EXAMEN ---
+# --- RUTAS: SIMULACRO DE EXAMEN (Sincronizada con error 405) ---
 
-@app.route("/api/generar_examen", methods=["POST"])
+@app.route("/api/exam/generate", methods=["POST"])
 def generar_examen():
     u = get_usuario_actual()
     if not u or u.consultas_usadas >= consultas_permitidas(u):
@@ -193,7 +188,7 @@ def generar_examen():
     data = request.json or {}
     cantidad_raw, _ = obtener_campo(data, "cantidad", tipo=int, default=5)
     cantidad = min(cantidad_raw, 20)
-    contenido = data.get("contenido", "")
+    contenido = data.get("contenido") or data.get("texto", "")
     tipos = data.get("tipos", ["Opción Múltiple"])
 
     if not isinstance(tipos, list) or not tipos:
@@ -224,9 +219,9 @@ def generar_examen():
         return jsonify({"error": "Error de base de datos"}), 500
     return jsonify(resp_json)
 
-# --- RUTAS: RED Y ESCRITO ---
+# --- RUTAS: RED Y ESCRITO (Sincronizadas) ---
 
-@app.route("/api/generar_red", methods=["POST"])
+@app.route("/api/concept/map", methods=["POST"])
 def generar_red():
     u = get_usuario_actual()
     if not u or u.consultas_usadas >= consultas_permitidas(u):
@@ -246,7 +241,7 @@ def generar_red():
     descontar_consulta(u)
     return jsonify(resultado)
 
-@app.route("/api/corregir_escrito", methods=["POST"])
+@app.route("/api/text/correct", methods=["POST"])
 def corregir_escrito():
     u = get_usuario_actual()
     if not u or u.consultas_usadas >= consultas_permitidas(u):
