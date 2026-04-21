@@ -7,55 +7,53 @@ from groq import Groq
 from flask import Flask, request, jsonify, session, redirect, url_for, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text, Index
+from sqlalchemy import text
 from authlib.integrations.flask_client import OAuth
-from flask_mail import Mail, Message
+from flask_mail import Mail
 
 # --- CONFIGURACIÓN E INFRAESTRUCTURA ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 port = int(os.environ.get("PORT", 5000))
-
 dist_path = os.path.join(os.path.dirname(__file__), 'dist')
 if not os.path.exists(dist_path):
     os.makedirs(dist_path, exist_ok=True)
 
 app = Flask(__name__, static_folder=dist_path, static_url_path='/')
 
+# Configuración de CORS dinámica
 allowed_origins_raw = os.environ.get("ALLOWED_ORIGINS", "")
-if not allowed_origins_raw:
-    allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "https://mentor-academico-0cn1.onrender.com"]
-else:
-    allowed_origins = [o.strip() for o in allowed_origins_raw.split(",")]
-
+allowed_origins = [o.strip() for o in allowed_origins_raw.split(",")] if allowed_origins_raw else ["http://localhost:5173", "https://mentor-academico-0cn1.onrender.com"]
 CORS(app, origins=allowed_origins, supports_credentials=True)
 
-secret_key = os.environ.get("SECRET_KEY", "dev_secret_key_provisional")
-app.secret_key = secret_key
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key_upe_2024")
 
-# --- CONFIGURACIÓN DE BASE DE DATOS ---
+# --- CONFIGURACIÓN DE BASE DE DATOS (Postgres / SQLite) ---
 db_uri_raw = os.environ.get("DATABASE_URL")
 if db_uri_raw:
-    db_uri = db_uri_raw.replace("postgres://", "postgresql://", 1).split("?")[0]
-    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_pre_ping": True,
-        "pool_recycle": 300,
-        "connect_args": {"sslmode": "require"}
-    }
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri_raw.replace("postgres://", "postgresql://", 1)
 else:
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    db_uri = 'sqlite:///' + os.path.join(basedir, 'local.db')
-    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
+    app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'local.db')
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["PERMANENT_SESSION_LIFETIME"] = datetime.timedelta(days=7)
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = True
-
-mail = Mail(app)
 db = SQLAlchemy(app)
+
+# --- MODELO DE USUARIO (Para la Tienda y Créditos) ---
+class Usuario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    consultas_usadas = db.Column(db.Integer, default=0)
+    bloques_ad_vistos = db.Column(db.Integer, default=0)
+    creditos_comprados = db.Column(db.Integer, default=0)
+    perfil_aprendizaje = db.Column(db.Text, default="{}")
+
+with app.app_context():
+    db.create_all()
+
+# --- IA Y AUTH ---
+client = Groq(api_key=os.environ.get("API_KEY"))
+MODEL_ID = "llama-3.3-70b-versatile"
 
 oauth = OAuth(app)
 google = oauth.register(
@@ -66,225 +64,109 @@ google = oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-api_key = os.environ.get("API_KEY")
-if not api_key:
-    raise ValueError("Falta la variable de entorno API_KEY")
-client = Groq(api_key=api_key)
-MODEL_ID = "llama-3.3-70b-versatile"
-
-# --- CONSTANTES Y PERFILES ---
-ACADEMIC_COACH_PERSONA = "Eres un entrenador académico universitario estricto y pedagógico."
-
-PERFILES_MATERIA = {
-    "higiene_upe": "ROL: Inspector Técnico de Higiene y Seguridad (UPE). Rigor legal y técnico máximo.",
-    "politica_upe": "ROL: Mentor de Política y Sociedad (UPE).",
-    "matematica_propedutico": "ROL: Profesor del Ciclo Propedéutico UPE. Tono motivador pero firme.",
-}
-
-# --- MODELO ---
-class Usuario(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(200), unique=True, nullable=False, index=True)
-    consultas_usadas = db.Column(db.Integer, default=0, nullable=False)
-    bloques_publicidad_vistos = db.Column(db.Integer, default=0, nullable=False)
-    creditos_comprados = db.Column(db.Integer, default=0, nullable=False)
-    material = db.Column(db.Text, default="")
-    perfil_aprendizaje = db.Column(db.Text, default="{}")
-
-# --- INICIALIZACIÓN DE BD ---
-try:
-    with app.app_context():
-        db.create_all()
-except Exception as e:
-    logger.error(f"Error en DB: {e}")
-
-# --- HELPERS ---
+# --- HELPERS DE NEGOCIO ---
 def get_usuario_actual():
     uid = session.get("usuario_id")
-    return db.session.get(Usuario, uid) if uid else None
+    if not uid: return None
+    return db.session.get(Usuario, uid)
 
 def consultas_permitidas(u):
-    return 4 + (u.bloques_publicidad_vistos * 2) + u.creditos_comprados
+    # 4 base + 2 por cada anuncio + comprados
+    return 4 + (u.bloques_ad_vistos * 2) + u.creditos_comprados
 
-def llamar_groq(prompt: str) -> dict:
+def llamar_groq(system_prompt, user_prompt):
     try:
-        chat_completion = client.chat.completions.create(
+        completion = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "Eres el Mentor Académico UPE. Responde solo en JSON técnico."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
             ],
             model=MODEL_ID,
-            response_format={"type": "json_object"},
-            timeout=45
+            response_format={"type": "json_object"}
         )
-        raw = chat_completion.choices[0].message.content
-        return json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.error(f"Groq devolvió JSON inválido: {e}")
-        raise ValueError("La IA devolvió una respuesta con formato inválido. Intentá de nuevo.")
+        return json.loads(completion.choices[0].message.content)
     except Exception as e:
-        logger.error(f"Error en llamada a Groq: {e}")
-        raise RuntimeError(f"Error al contactar el servicio de IA: {str(e)}")
+        logger.error(f"Error Groq: {e}")
+        return {"error": "Servicio de IA temporalmente fuera de línea."}
 
-def descontar_consulta(u: Usuario) -> bool:
-    try:
-        u.consultas_usadas += 1
-        db.session.commit()
-        return True
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error al guardar consulta para usuario {u.id}: {e}")
-        return False
-
-def obtener_campo(data: dict, campo: str, tipo=str, default=None, requerido=False):
-    valor = data.get(campo, default)
-    if requerido and valor is None:
-        return None, f"El campo '{campo}' es requerido."
-    if valor is not None:
-        try:
-            valor = tipo(valor)
-        except (ValueError, TypeError):
-            return None, f"El campo '{campo}' debe ser de tipo {tipo.__name__}."
-    return valor, None
-
-# --- RUTAS PRINCIPALES ---
-
-@app.route("/api/math_logic", methods=["POST"])
-def math_logic():
-    u = get_usuario_actual()
-    if not u or u.consultas_usadas >= consultas_permitidas(u):
-        return jsonify({"error": "No autorizado o sin créditos"}), 403
-    data = request.json or {}
-    tipo, err = obtener_campo(data, "tipo", requerido=True)
-    if err: return jsonify({"error": err}), 400
-    tema, err = obtener_campo(data, "tema", requerido=True)
-    if err: return jsonify({"error": err}), 400
-    ejercicio, err = obtener_campo(data, "ejercicio", requerido=True)
-    if err: return jsonify({"error": err}), 400
-    resolucion_alumno = data.get("resolucion", "")
-    prompt = f"""
-    {PERFILES_MATERIA['matematica_propedutico']}
-    TAREA: {tipo.upper()} el siguiente ejercicio de {tema}: {ejercicio}.
-    {f"Resolución del alumno a corregir: {resolucion_alumno}" if tipo == 'corregir' else "Explica el paso a paso."}
-    Usa un tono intermedio, motivador pero estricto con los signos y reglas. Usa LaTeX.
-    Responde en JSON con: 'explicacion', 'pasos' (lista), 'resultado' y 'feedback_entrenador'.
-    """
-    try:
-        resultado = llamar_groq(prompt)
-    except (ValueError, RuntimeError) as e:
-        return jsonify({"error": str(e)}), 502
-    if not descontar_consulta(u):
-        return jsonify({"error": "No se pudo registrar la consulta."}), 500
-    return jsonify(resultado)
-
-@app.route("/api/generar_examen", methods=["POST"])
-def generar_examen():
-    u = get_usuario_actual()
-    if not u or u.consultas_usadas >= consultas_permitidas(u):
-        return jsonify({"error": "Sin créditos"}), 403
-    data = request.json or {}
-    cantidad_raw, err = obtener_campo(data, "cantidad", tipo=int, default=5)
-    if err: return jsonify({"error": err}), 400
-    cantidad = min(cantidad_raw, 20)
-    contenido = data.get("contenido", "")
-    tipos = data.get("tipos", ["Opción Múltiple"])
-    if not isinstance(tipos, list) or len(tipos) == 0:
-        return jsonify({"error": "Lista de tipos inválida."}), 400
-    cant_base = cantidad // len(tipos)
-    resto = cantidad % len(tipos)
-    distribucion = {t: cant_base + (1 if i < resto else 0) for i, t in enumerate(tipos)}
-    prompt = f"""
-    {PERFILES_MATERIA['higiene_upe']}
-    Genera EXACTAMENTE {cantidad} preguntas basadas en: {contenido}.
-    Distribución exacta por tipo: {distribucion}.
-    REGLA: 'respuesta_correcta' debe ser el TEXTO EXACTO de la opción.
-    JSON: 'preguntas' [id, tipo, pregunta, opciones, respuesta_correcta, justificacion_tecnica].
-    """
-    try:
-        resp_json = llamar_groq(prompt)
-    except (ValueError, RuntimeError) as e:
-        return jsonify({"error": str(e)}), 502
-    for p in resp_json.get("preguntas", []):
-        if p.get("tipo") == "Opción Múltiple" and isinstance(p.get("opciones"), list):
-            random.shuffle(p["opciones"])
-    if not descontar_consulta(u):
-        return jsonify({"error": "No se pudo registrar la consulta."}), 500
-    return jsonify(resp_json)
-
-@app.route("/api/generar_red", methods=["POST"])
-def generar_red():
-    u = get_usuario_actual()
-    if not u or u.consultas_usadas >= consultas_permitidas(u):
-        return jsonify({"error": "No autorizado o sin créditos"}), 403
-    data = request.json or {}
-    texto, err = obtener_campo(data, "texto", requerido=True)
-    if err: return jsonify({"error": err}), 400
-    prompt = f"Genera una red conceptual: {texto}. JSON con 'nodos' y 'enlaces'."
-    try:
-        resultado = llamar_groq(prompt)
-    except (ValueError, RuntimeError) as e:
-        return jsonify({"error": str(e)}), 502
-    descontar_consulta(u)
-    return jsonify(resultado)
-
-@app.route("/api/corregir_escrito", methods=["POST"])
-def corregir_escrito():
-    u = get_usuario_actual()
-    if not u or u.consultas_usadas >= consultas_permitidas(u):
-        return jsonify({"error": "No autorizado o sin créditos"}), 403
-    data = request.json or {}
-    texto, err = obtener_campo(data, "texto", requerido=True)
-    if err: return jsonify({"error": err}), 400
-    prompt = f"{PERFILES_MATERIA['higiene_upe']} Evalúa: {texto}. JSON: 'texto_corregido', 'observaciones_legales', 'nota', 'performanceAnalysis', 'feedback_entrenador'."
-    try:
-        resultado = llamar_groq(prompt)
-    except (ValueError, RuntimeError) as e:
-        return jsonify({"error": str(e)}), 502
-    descontar_consulta(u)
-    return jsonify(resultado)
-
-# --- CAPA DE COMPATIBILIDAD (ALIASES) ---
-app.add_url_rule("/api/explicar_concepto", view_func=math_logic, methods=["POST"])
-app.add_url_rule("/api/generar_resumen",   view_func=corregir_escrito, methods=["POST"])
-app.add_url_rule("/api/corregir_informe",  view_func=corregir_escrito, methods=["POST"])
-app.add_url_rule("/api/math/logic",        view_func=math_logic, methods=["POST"])
-app.add_url_rule("/api/exam/generate",     view_func=generar_examen, methods=["POST"])
-app.add_url_rule("/api/text/correct",      view_func=corregir_escrito, methods=["POST"])
+# --- RUTAS DE API (Sincronizadas con App.tsx) ---
 
 @app.route("/api/usuario")
 def info_usuario():
     u = get_usuario_actual()
-    if not u: return jsonify({"logueado": False})
+    if not u: return jsonify({"logueado": False, "restantes": 0})
+    restantes = consultas_permitidas(u) - u.consultas_usadas
     return jsonify({
         "logueado": True,
         "email": u.email,
-        "restantes": consultas_permitidas(u) - u.consultas_usadas,
-        "perfil": json.loads(u.perfil_aprendizaje)
+        "restantes": max(0, restantes),
+        "total_hoy": consultas_permitidas(u),
+        "url_ad": "https://www.google.com" # Aquí iría tu link de afiliado o ad
     })
 
+@app.route("/api/registrar_ad", methods=["POST"])
+def registrar_ad():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No logueado"}), 401
+    u.bloques_ad_vistos += 1
+    db.session.commit()
+    return jsonify({"success": True})
+
+@app.route("/api/explicar_concepto", methods=["POST"])
+def explicar_concepto():
+    u = get_usuario_actual()
+    if not u or (consultas_permitidas(u) - u.consultas_usadas) <= 0:
+        return jsonify({"error": "Sin créditos"}), 403
+    
+    data = request.json
+    prompt_sistema = f"Eres el Mentor Académico UPE. Especialidad: {data.get('materia')}. Responde en JSON con campo 'resultado'."
+    prompt_usuario = f"Explica esto: {data.get('pregunta')} basado en: {data.get('texto')}. Modo legal: {data.get('modo_legal')}"
+    
+    res = llamar_groq(prompt_sistema, prompt_usuario)
+    u.consultas_usadas += 1
+    db.session.commit()
+    return jsonify({"resultado": res.get("resultado"), "restantes": consultas_permitidas(u) - u.consultas_usadas})
+
+@app.route("/api/generar_red", methods=["POST"])
+def generar_red():
+    u = get_usuario_actual()
+    if not u: return jsonify({"error": "No logueado"}), 401
+    
+    data = request.json
+    prompt_sistema = "Eres un experto en mapas conceptuales. Genera JSON con 'nodos' (id, label) y 'enlaces' (from, to)."
+    prompt_usuario = f"Crea una red conceptual de: {data.get('texto')}"
+    
+    res = llamar_groq(prompt_sistema, prompt_usuario)
+    u.consultas_usadas += 1
+    db.session.commit()
+    return jsonify({"resultado": res, "restantes": consultas_permitidas(u) - u.consultas_usadas})
+
+@app.route("/api/math/explain", methods=["POST"])
+def math_explain():
+    u = get_usuario_actual()
+    data = request.json
+    prompt_sistema = "Eres profesor de matemáticas UPE. Responde JSON con 'resultado' (pasos en LaTeX)."
+    res = llamar_groq(prompt_sistema, f"Explica: {data.get('exercise')} de {data.get('topic')}")
+    u.consultas_usadas += 1
+    db.session.commit()
+    return jsonify({"resultado": res.get("resultado"), "restantes": consultas_permitidas(u) - u.consultas_usadas})
+
+# --- RUTAS DE AUTH ---
 @app.route("/login")
 def login():
     return google.authorize_redirect(url_for("callback", _external=True))
 
 @app.route("/callback")
 def callback():
-    try:
-        token = google.authorize_access_token()
-        userinfo = token.get("userinfo")
-        if not userinfo or not userinfo.get("email"):
-            return "Error al obtener datos de Google", 400
-        email = userinfo['email']
-        u = Usuario.query.filter_by(email=email).first()
-        if not u:
-            u = Usuario(email=email)
-            db.session.add(u)
-            db.session.commit()
-        session["usuario_id"] = u.id
-        session.permanent = True
-        return redirect("/")
-    except Exception as e:
-        logger.error(f"Error en Google Auth: {e}")
-        return f"Error en la autenticación: {str(e)}", 500
+    token = google.authorize_access_token()
+    user_info = token.get('userinfo')
+    u = Usuario.query.filter_by(email=user_info['email']).first()
+    if not u:
+        u = Usuario(email=user_info['email'])
+        db.session.add(u)
+        db.session.commit()
+    session["usuario_id"] = u.id
+    return redirect("/")
 
 @app.route("/logout")
 def logout():
@@ -292,8 +174,8 @@ def logout():
     return redirect("/")
 
 @app.route("/")
-def index():
-    return send_from_directory(app.static_folder, "index.html")
+def serve():
+    return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=port)
