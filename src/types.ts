@@ -1,4 +1,4 @@
- // src/types.ts
+// src/types.ts
 
 // 1. Estados de la Aplicación
 export enum AppState {
@@ -135,7 +135,7 @@ export interface ConceptualNetworkResult {
   title: string;
   summary: string;
   nodes: ConceptualNode[];
-  edges: ConceptualEdge[]; // Sincronizado con 'edges' (antes 'enlaces' en backend)
+  edges: ConceptualEdge[]; 
 }
 
 // --- 6.4 INTERFACES MÓDULO MATEMÁTICAS ---
@@ -146,15 +146,16 @@ export interface MathExplainerInput {
 }
 
 export interface MathExplainerResult {
-  explicacion: string; // Sincronizado con backend
-  pasos: string[];    // Sincronizado con backend
-  resultado_final: string; // Sincronizado con backend
+  explicacion: string; 
+  pasos: string[];    
+  resultado_final: string; 
   theoreticalContext?: string;
   similarExample?: {
-    problem: string;
-    solutionSteps: string[];
-    finalResult: string;
-    explanation: string;
+    exercise?: string; // Sincronizado con componente MathExplainerResults
+    problem?: string;
+    solutionSteps?: string[];
+    finalResult?: string;
+    explanation?: string;
   };
   keyFormulas?: string[];
   tips?: string[];
@@ -184,8 +185,8 @@ export interface MathCorrectionResult {
 
 // --- 6.5 INTERFACES SIMULACRO DE EXAMEN ---
 
-// Sincronizado con nombres en español para evitar errores de conexión/mapeo
-export type ExamQuestionType = 'Opción Múltiple' | 'Desarrollo' | 'Justificación';
+// FIX: Se agregan los tipos en inglés para coincidir con las asignaciones del componente ExamInputView
+export type ExamQuestionType = 'Opción Múltiple' | 'Desarrollo' | 'Justificación' | 'multiple-choice' | 'development' | 'justification';
 
 export interface ExamQuestion {
   id: string;
