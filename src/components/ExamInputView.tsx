@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppState, ExamQuestionType } from '../types';
+import { ExamQuestionType } from '../types';
 
 interface ExamInputViewProps {
   onStart: (material: string, count: number, types: ExamQuestionType[]) => void;
@@ -10,7 +10,8 @@ interface ExamInputViewProps {
 const ExamInputView: React.FC<ExamInputViewProps> = ({ onStart, onBack, isLoading }) => {
   const [material, setMaterial] = useState('');
   const [count, setCount] = useState(5);
-  const [types, setTypes] = useState<ExamQuestionType[]>(['multiple-choice']);
+  // FIX: Se asegura la asignación inicial con el tipo correcto
+  const [types, setTypes] = useState<ExamQuestionType[]>(['multiple-choice' as ExamQuestionType]);
 
   const toggleType = (type: ExamQuestionType) => {
     if (types.includes(type)) {
@@ -69,9 +70,11 @@ const ExamInputView: React.FC<ExamInputViewProps> = ({ onStart, onBack, isLoadin
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">Tipos de Preguntas</label>
             <div className="flex flex-wrap gap-2">
+              {/* FIX: Se mapea usando las claves que TypeScript ahora reconoce en types.ts */}
               {(['multiple-choice', 'development', 'justification'] as ExamQuestionType[]).map(type => (
                 <button
                   key={type}
+                  type="button"
                   onClick={() => toggleType(type)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                     types.includes(type)
@@ -79,7 +82,8 @@ const ExamInputView: React.FC<ExamInputViewProps> = ({ onStart, onBack, isLoadin
                       : 'bg-white border-slate-200 text-slate-600'
                   }`}
                 >
-                  {type === 'multiple-choice' ? 'Opción Múltiple' : type === 'development' ? 'Desarrollo' : 'Justificación'}
+                  {type === ('multiple-choice' as ExamQuestionType) ? 'Opción Múltiple' : 
+                   type === ('development' as ExamQuestionType) ? 'Desarrollo' : 'Justificación'}
                 </button>
               ))}
             </div>
